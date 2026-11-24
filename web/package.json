@@ -9,7 +9,8 @@
     "build": "vite build && node scripts/esp32-pack.mjs",
     "preview": "vite preview --host",
     "map": "node scripts/build-map.mjs",
-    "mock": "node scripts/mock-esp32.mjs"
+    "mock": "node scripts/mock-esp32.mjs",
+    "deploy:pages": "node scripts/deploy-pages.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/atkinson-hyperlegible-mono": "^5.3.0",

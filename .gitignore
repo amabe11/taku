@@ -20,3 +20,5 @@ _netrc
 .claude/settings.local.json
 
 # web/data/ SÍ se versiona: es la carpeta lista para subir a LittleFS (regenerar con npm run build)
+web/dist-pages/
+server/node_modules/

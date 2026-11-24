@@ -23,7 +23,8 @@ function resolveMode() {
   if (q === '1') return 'demo';
   if (q === '0') return 'device';
   try { const saved = JSON.parse(localStorage.getItem('hg.mode') || 'null'); if (saved) return saved; } catch { /* sin almacenamiento */ }
-  return import.meta.env.DEV ? 'demo' : 'device';
+  // Web publicada (GitHub Pages / Vercel): sin placa, arranca en demostración. Web del ESP32: estación real.
+  return import.meta.env.DEV || import.meta.env.VITE_TARGET === 'cloud' ? 'demo' : 'device';
 }
 state.mode = resolveMode();
 state.api = createApi(state.mode);

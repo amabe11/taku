@@ -8,6 +8,7 @@ import { persistGranted, requestPersist } from '../store.js';
 import { switchMode } from '../components/shell.js';
 import { downloadText } from '../csv.js';
 import { viewHeader, dl } from './common.js';
+import { cloudCfg, saveCloudCfg, testCloud, syncAll, pullAll, exportBackup, importBackup } from '../cloud.js';
 
 export function configuracionView() {
   const dataCard = h('section', { class: 'card', 'aria-labelledby': 'cfg-data' });
@@ -65,6 +66,37 @@ export function configuracionView() {
   const critErr = h('p', { class: 'form-error', role: 'alert', hidden: true });
   critForm.append(critErr);
 
+  // ---------------- nube (MongoDB Atlas vía API)
+  const cc = cloudCfg();
+  const cloudStatus = h('p', { class: 'meta', role: 'status', style: { margin: 0 } }, cc.ultima ? `Última sincronización: ${new Date(cc.ultima).toLocaleString('es-BO')}` : 'Sin sincronizar todavía.');
+  const apiIn = h('input', { class: 'input mono', id: 'cl-api', name: 'api', type: 'url', autocomplete: 'off', spellcheck: 'false', placeholder: 'https://tu-proyecto.vercel.app', value: cc.api || '' });
+  const keyIn = h('input', { class: 'input mono', id: 'cl-key', name: 'key', type: 'password', autocomplete: 'off', value: cc.key || '' });
+  const fileIn = h('input', { type: 'file', accept: 'application/json,.json', class: 'sr-only', id: 'cl-file', onchange: async (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    try { const r = await importBackup(await f.text()); say(`Respaldo importado: ${r.corridas} corridas y ${r.lemna} observaciones de Lemna nuevas.`); }
+    catch (err) { say(`No se pudo importar: ${err.message}`); }
+    e.target.value = '';
+  } });
+  const say = (t) => { cloudStatus.textContent = t; announce(t); };
+  const run = (label, fn) => async () => {
+    saveCloudCfg({ ...cloudCfg(), api: apiIn.value.trim().replace(/\/$/, ''), key: keyIn.value });
+    say(`${label}…`);
+    try { say(await fn()); } catch (err) { say(`${label}: ${err.message}${/fetch|NetworkError|Failed/.test(err.message) ? ' (¿hay internet?)' : ''}`); }
+  };
+  const cloudCard = h('form', { class: 'card', 'aria-labelledby': 'cfg-cloud', onsubmit: (e) => e.preventDefault() },
+    h('h2', { class: 'card-title', id: 'cfg-cloud' }, 'Nube del equipo (MongoDB)'),
+    h('p', { class: 'meta' }, 'Los datos se guardan primero en este navegador. Con internet, se copian a la base MongoDB del equipo para que todos los vean. La clave del equipo queda solo en este navegador.'),
+    h('div', { class: 'fields' },
+      h('div', { class: 'field' }, h('label', { for: 'cl-api' }, 'Dirección de la API'), apiIn),
+      h('div', { class: 'field' }, h('label', { for: 'cl-key' }, 'Clave del equipo'), keyIn)),
+    h('div', { class: 'view-actions' },
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: run('Probando conexión', async () => { const hh = await testCloud(cloudCfg()); return `Conexión correcta con la base «${hh.base}».`; }) }, icon('sync'), 'Probar conexión'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: run('Sincronizando', async () => { const t = await syncAll((m) => (cloudStatus.textContent = m)); return `Sincronizado: ${t.corridas} corridas, ${t.lemna} observaciones de Lemna y ${t.escenas} comparaciones satelitales.`; }) }, icon('download'), 'Sincronizar con la nube'),
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: run('Trayendo datos', async () => { const t = await pullAll(); return `Traídos de la nube: ${t.corridas} corridas y ${t.lemna} observaciones nuevas.`; }) }, 'Traer datos del equipo'),
+      h('label', { class: 'btn btn-quiet', for: 'cl-file' }, 'Importar respaldo JSON'), fileIn),
+    cloudStatus,
+    h('p', { class: 'meta', style: { margin: 0 } }, 'Desde la web del ESP32 (sin internet): descarga el «Respaldo completo (JSON)» y luego impórtalo aquí, en la web publicada, para sincronizarlo.'));
+
   const about = h('section', { class: 'card', 'aria-labelledby': 'cfg-about' },
     h('h2', { class: 'card-title', id: 'cfg-about' }, 'Acerca de esta web'),
     dl([
@@ -79,7 +111,7 @@ export function configuracionView() {
 
   const el = h('div', { class: 'view' },
     viewHeader('Configuración', 'Opciones locales de esta web. Los cambios se guardan en este navegador.'),
-    h('div', { class: 'two-col' }, modeForm, critForm, state.mode === 'demo' ? simForm : null, dataCard, about));
+    h('div', { class: 'two-col' }, modeForm, cloudCard, critForm, state.mode === 'demo' ? simForm : null, dataCard, about));
 
   async function renderData() {
     const granted = await persistGranted();
@@ -94,9 +126,7 @@ export function configuracionView() {
       h('div', { class: 'view-actions' },
         granted ? null : h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => { const ok = await requestPersist(); announce(ok ? 'Almacenamiento persistente concedido.' : 'El navegador no concedió almacenamiento persistente.'); renderData(); } }, 'Pedir almacenamiento persistente'),
         h('button', { class: 'btn btn-ghost', type: 'button', disabled: !n, onclick: async () => {
-          const corridas = [];
-          for (const r of state.runs) corridas.push({ ...r, filas: (await rowsOf(r.run_id)).filter(Boolean) });
-          downloadText(JSON.stringify({ generado: new Date().toISOString(), corridas }, null, 2), `hg-guard_respaldo_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+          downloadText(JSON.stringify(await exportBackup(), null, 2), `hg-guard_respaldo_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
           announce('Respaldo JSON descargado.');
         } }, icon('download'), 'Respaldo completo (JSON)'),
         h('button', { class: 'btn btn-danger', type: 'button', disabled: !n || state.tracking, onclick: confirmClear }, 'Borrar datos locales')),
