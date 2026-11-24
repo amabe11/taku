@@ -7,7 +7,7 @@ import { rowsOf, refreshList } from './runs.js';
 import { loadLemna } from './views/bioindicador.js';
 import { N_ROWS } from './state.js';
 
-export const DEFAULT_API = (import.meta.env.VITE_CLOUD_API || '').replace(/\/$/, '');
+export const DEFAULT_API = (import.meta.env.VITE_CLOUD_API || 'https://taku-server.vercel.app').replace(/\/$/, '');
 
 export function cloudCfg() {
   try { return { api: DEFAULT_API, key: '', ultima: null, ...JSON.parse(localStorage.getItem('hg.cloud') || '{}') }; } catch { return { api: DEFAULT_API, key: '', ultima: null }; }
