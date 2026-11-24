@@ -1,0 +1,22 @@
+# dependencias y compilados (se regeneran con npm install / npm run build)
+node_modules/
+web/dist/
+.vite/
+
+# temporales
+tmp/
+*.log
+.DS_Store
+Thumbs.db
+
+# credenciales locales (Earthdata, Copernicus, etc.): nunca al repositorio
+.env
+.env.*
+.netrc
+_netrc
+*.pem
+
+# configuración local de herramientas
+.claude/settings.local.json
+
+# web/data/ SÍ se versiona: es la carpeta lista para subir a LittleFS (regenerar con npm run build)

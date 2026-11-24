@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#101124">
+  <meta name="description" content="Web local de la estación Hg-Guard: corrida de banco de 120 s, evidencia de la muestra y exportación CSV sin internet.">
+  <title>Estación de monitoreo · Hg-Guard</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23101124'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%238B5CF6' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="preload" href="./src/assets/fonts/ahn.woff2" as="font" type="font/woff2" crossorigin>
+  <script type="module" src="./src/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+
+  <div class="app" id="app" data-sidebar="expanded">
+    <aside class="sidebar" id="sidebar" aria-label="Navegación y estación"></aside>
+
+    <header class="topbar" id="topbar"></header>
+
+    <div class="app-body">
+      <div class="demo-banner" id="demo-banner" role="region" aria-label="Aviso de modo de operación" hidden></div>
+      <main id="main" tabindex="-1">
+        <noscript><p class="p-6">Esta página necesita JavaScript para comunicarse con la estación.</p></noscript>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="drawer" id="nav-drawer" aria-label="Menú de navegación">
+    <div class="drawer-scroller">
+      <div class="drawer-sheet" id="nav-drawer-sheet"></div>
+    </div>
+  </dialog>
+
+  <dialog class="modal" id="run-dialog" aria-labelledby="run-dialog-title"></dialog>
+  <dialog class="modal modal--sm" id="confirm-dialog" aria-labelledby="confirm-dialog-title"></dialog>
+
+  <div id="station-popup" class="station-popup" popover="auto" role="dialog" aria-label="Ficha de la estación"></div>
+
+  <div class="sr-only" role="region" aria-label="Avisos de la estación">
+    <p>Avisos de la estación</p>
+    <div id="live" aria-live="polite" aria-atomic="true"></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,53 @@
+/* ===================================================================== módulos: zona, Lemna, satélite, relieve */
+@layer components {
+  /* zona de interés (Yungas): contorno discontinuo, sin relleno de «nivel» */
+  .map-zona { fill: rgb(124 200 255 / 0.07); stroke: var(--state-info); stroke-width: 1.4; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
+  .map-zona-label { font-family: var(--font-sans); font-weight: 600; fill: var(--state-info); }
+  .map-svg[data-hide~="zona"] .layer-zona { display: none; }
+  .sym-zona { width: 14px; height: 10px; border: 1.5px dashed var(--state-info); background: rgb(124 200 255 / 0.1); border-radius: 2px; }
+
+  /* Lemna */
+  .lemna-preview:empty { display: none; }
+  .lemna-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+  .lemna-pair figure, .sat-fig { margin: 0; display: grid; gap: 6px; }
+  .lemna-pair img, .sat-fig img { width: 100%; height: auto; border-radius: var(--r-sm); border: 1px solid var(--color-border); background: var(--color-bg); image-rendering: auto; }
+  .lemna-pair figcaption, .sat-fig figcaption { font-size: var(--fs-xs); color: var(--color-text-muted); }
+  .lemna-thumb { width: 72px; height: auto; border-radius: 4px; border: 1px solid var(--color-border); display: block; }
+  .lemna-chart-box { margin-bottom: var(--sp-3); }
+  .chart-svg.lemna-chart, .chart-svg.mini-chart { width: 100%; height: auto; max-width: 640px; max-height: 280px; display: block; }
+  .card > .card-title + .fields, .card > .card-title + .meta + .fields { margin-top: var(--sp-3); }
+  .lemna-control { fill: none; stroke: var(--color-text-muted); stroke-width: 2; stroke-dasharray: 6 4; }
+  .lemna-muestra { fill: none; stroke: var(--color-accent); stroke-width: 2.25; }
+  .lemna-control-pt { fill: var(--color-bg); stroke: var(--color-text-muted); stroke-width: 2; }
+  .lemna-muestra-pt { fill: var(--color-accent-soft); stroke: var(--color-bg); stroke-width: 1.5; }
+
+  /* escenas */
+  .scene-list { display: grid; gap: var(--sp-2); max-height: 420px; overflow: auto; padding-right: 4px; }
+  .scene-card { display: grid; grid-template-columns: auto 64px 1fr; gap: var(--sp-3); align-items: center; padding: var(--sp-2); border: 1px solid var(--color-border); border-radius: var(--r-md); background: var(--color-panel); min-height: var(--tap); }
+  .scene-card:has(input:checked) { border-color: var(--color-accent); box-shadow: var(--glow-accent); }
+  .scene-card input { width: 18px; height: 18px; accent-color: var(--color-accent); }
+  .scene-card img, .scene-ph { width: 64px; height: 64px; object-fit: cover; border-radius: var(--r-sm); background: var(--color-bg); display: grid; place-items: center; }
+  .scene-txt { display: grid; gap: 2px; font-size: var(--fs-sm); min-width: 0; }
+  .scene-txt .meta { overflow-wrap: anywhere; }
+  .sat-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); margin-bottom: var(--sp-3); }
+  .hls-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .ramp { display: inline-block; width: 64px; height: 10px; border-radius: 2px; border: 1px solid var(--color-border); }
+  .ramp-ndvi { background: linear-gradient(90deg, rgb(60 48 40), rgb(140 120 80), rgb(120 170 90), rgb(40 140 70), rgb(10 90 50)); }
+  .ramp-diff { background: linear-gradient(90deg, rgb(166 97 26), rgb(235 235 235), rgb(1 133 113)); }
+  .saved-list { margin: 0; padding-inline-start: 1.1em; display: grid; gap: 4px; font-size: var(--fs-sm); }
+  .saved-list a, .ref-list a { color: var(--color-accent-soft); font-weight: 600; text-underline-offset: 3px; overflow-wrap: anywhere; }
+  .ref-list { margin: 0 0 var(--sp-3); padding: 0; list-style: none; display: grid; gap: var(--sp-2); }
+  .ref-list li { display: grid; gap: 2px; }
+
+  /* relieve */
+  .relief-wrap { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); align-items: start; }
+  @container (width >= 720px) { .relief-wrap { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } }
+  .relief-canvas { width: 100%; height: auto; border-radius: var(--r-sm); border: 1px solid var(--color-border); }
+  .card:has(.relief-wrap) { container-type: inline-size; }
+
+  /* priorización */
+  .prio-rank { font-family: var(--font-mono); font-weight: 700; font-size: var(--fs-md); }
+  .reasons { margin: 0; padding-inline-start: 1.1em; font-size: var(--fs-sm); }
+  .community { border-style: dashed; }
+  .community p { max-width: 70ch; }
+}
