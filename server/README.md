@@ -1,5 +1,7 @@
 # API en la nube de Hg-Guard (MongoDB)
 
+Desplegada en **https://taku-server.vercel.app** (estado en `/api/health`).
+
 Guarda en **MongoDB Atlas** las corridas de la estación (con sus 121 filas), las observaciones del bioindicador Lemna
 y los manifiestos satelitales. La web los guarda primero en el navegador y los copia aquí con
 **Configuración → Nube del equipo → Sincronizar**.
@@ -17,7 +19,7 @@ y los manifiestos satelitales. La web los guarda primero en el navegador y los c
 
 | Ruta | Método | Clave | Qué hace |
 |---|---|---|---|
-| `/api/health` | GET | No | Estado de la API y ping a MongoDB |
+| `/` y `/api/health` | GET | No | Estado de la API y ping a MongoDB |
 | `/api/sync` | POST | `x-hg-key` | Inserta o actualiza por `run_id` (corridas) o `id` (Lemna, escenas). Repetir no duplica |
 | `/api/datos?coleccion=corridas\|lemna\|escenas[&id=][&filas=1]` | GET | `x-hg-key` | Lista o detalle |
 

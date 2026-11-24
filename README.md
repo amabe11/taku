@@ -30,6 +30,7 @@ sitio piloto por definir). La Paz, 23 al 25 de noviembre de 2026.
 
 **https://amabe11.github.io/taku/**: arranca en modo demostración porque ahí no hay placa. Se publica con
 `npm run deploy:pages` desde `web/` (GitHub Pages, gratis).
+API de datos: **https://taku-server.vercel.app** (Vercel Hobby + MongoDB Atlas M0, gratis).
 
 ## Arranque rápido
 

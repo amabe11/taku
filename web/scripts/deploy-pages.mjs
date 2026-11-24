@@ -1,7 +1,7 @@
 // Publica la web en GitHub Pages (gratis en repositorios públicos, sin tarjeta ni costos).
 // Compila la variante «nube» (arranca en demostración porque no hay placa) y la sube a la rama gh-pages.
 // Uso:  npm run deploy:pages
-//       VITE_CLOUD_API=https://tu-api.vercel.app npm run deploy:pages   (deja la API de MongoDB preconfigurada)
+//       VITE_CLOUD_API=https://otra-api.vercel.app npm run deploy:pages   (otra dirección de API)
 import { execSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, cpSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const web = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(web, 'dist-pages');
-const run = (cmd, cwd = web) => execSync(cmd, { cwd, stdio: 'inherit', env: { ...process.env, VITE_TARGET: 'cloud' } });
+const API = process.env.VITE_CLOUD_API || 'https://taku-server.vercel.app';
+const run = (cmd, cwd = web) => execSync(cmd, { cwd, stdio: 'inherit', env: { ...process.env, VITE_TARGET: 'cloud', VITE_CLOUD_API: API } });
 
 rmSync(out, { recursive: true, force: true });
 run(`npx vite build --outDir dist-pages --emptyOutDir`);
