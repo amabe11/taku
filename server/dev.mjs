@@ -6,8 +6,9 @@ import health from './api/health.js';
 import sync from './api/sync.js';
 import datos from './api/datos.js';
 import alertas from './api/alertas.js';
+import reportes from './api/reportes.js';
 
-const ROUTES = { '/api/health': health, '/api/sync': sync, '/api/datos': datos, '/api/alertas': alertas };
+const ROUTES = { '/api/health': health, '/api/sync': sync, '/api/datos': datos, '/api/alertas': alertas, '/api/reportes': reportes };
 const PORT = Number(process.env.PORT || 3001);
 
 createServer(async (req, res) => {

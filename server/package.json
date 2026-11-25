@@ -8,7 +8,8 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "node dev.mjs"
+    "dev": "node dev.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "mongodb": "^7.0.0"
