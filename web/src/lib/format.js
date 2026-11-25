@@ -31,3 +31,13 @@ export function ranges(list) {
   }
   return out.join(', ');
 }
+const dof = new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium' });
+export const dateOnly = (iso) => (iso ? dof.format(new Date(iso.length === 10 ? `${iso}T12:00:00` : iso)) : '—');
+/** Concentración en mg/kg: hasta 3 decimales bajo 1, 2 bajo 10, 1 hasta 100, entero arriba. */
+export function conc(v) {
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  const n = Number(v);
+  const [min, max] = n < 1 ? [2, 3] : n < 10 ? [2, 2] : n < 100 ? [1, 1] : [0, 0];
+  return new Intl.NumberFormat('es-BO', { minimumFractionDigits: min, maximumFractionDigits: max }).format(n);
+}
+export const pct = (v) => (v == null ? '—' : `${nf0.format(v * 100)} %`);

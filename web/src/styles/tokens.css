@@ -1,8 +1,8 @@
 /* =====================================================================
-   Hg-Guard · tokens de diseño en tres capas
+   Ahgora · tokens de diseño en tres capas
    primitivo (--p-*) → semántico (--color-*, --state-*, --hg-*, --fs-*, --sp-*)
    → componente (--btn-*, --card-*, --chart-*, --map-*, --marker-*, …)
-   Fuente de verdad: design-system/hg-guard/MASTER.md
+   Fuente de verdad: design-system/ahgora/MASTER.md
    ===================================================================== */
 
 /* ---------- Capa 1 · primitivos (valores crudos, sin significado) ---------- */

@@ -1,17 +1,13 @@
-// Exportación CSV offline. UTF-8 con BOM (Excel), coma como separador, punto decimal, hora ISO.
-// Siempre 121 filas (seq 0..120): las faltantes o inválidas quedan vacías y con motivo.
-// Sensores: DS18B20 (temp_c, °C) y lector de tiras TCS34725 (cuentas r, g, b, c, sin unidad física).
-// delta_cromatico es adimensional (×100) respecto a la referencia indicada: no es una concentración.
-import { N_ROWS } from './state.js';
-import { derive } from './lib/optics.js';
+// Exportación de datos y reportes (sección 7.3): CSV, GeoJSON y versión pública con zonas agregadas (7.7).
+// CSV: UTF-8 con BOM (Excel), coma como separador, punto decimal, hora ISO.
+import { estimado, controlesFallidos, zonaPublica, SEMAFORO, CERTEZA, ETIQUETA_LEGAL } from './model.js';
 
 export const COLUMNS = [
-  'run_id', 'id_muestra', 'id_caso', 'fecha_iso', 'seq', 't_seg', 'temp_c', 'r', 'g', 'b', 'c', 'delta_cromatico',
-  'volumen_ml', 'config_id', 'estado', 'motivo', 'origen', 'estado_hg',
-  // metadatos de la ficha
-  'demostracion', 'estacion', 'build', 'matriz', 'tipo_corrida', 'lote_tira', 'sensor_optico', 'ganancia', 'integracion_ms',
-  'referencia_delta', 'control_volumen', 'control_camara', 'control_tira', 'control_sonda', 'control_sensores', 'control_blanco',
-  'criterio_hg', 'motivo_hg', 'operador', 'permiso_uso', 'incidencias',
+  'codigo', 'matriz', 'cabezal', 'fecha_iso', 'lat', 'lon', 'responsable', 'cuenca',
+  'c_ext_mg_l', 'v_ext_l', 'm_humeda_kg', 'm_tejido_kg', 'f_seco', 'recuperacion_r', 'c_estimada_mg_kg', 'base',
+  'delta_e', 'pico_ua', 'semaforo', 'controles_fallidos', 'calibracion', 'firmware', 'certeza',
+  'laboratorio', 'enviada_en', 'fecha_resultado', 'metodo_lab', 'resultado_lab_mg_kg', 'base_lab',
+  'visibilidad', 'alerta', 'demostracion', 'etiqueta',
 ];
 
 function cell(v) {
@@ -19,59 +15,80 @@ function cell(v) {
   const s = String(v);
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
-const num = (v, d) => (v === null || v === undefined || Number.isNaN(v) ? '' : Number(v).toFixed(d));
 
-export function buildCsv(run, rows) {
-  const c = run.controles || {};
-  const yesNo = (b) => (b ? 'si' : 'no');
-  const o = run.optica || {};
-  const crit = run.hg_tira?.criterio;
-  const meta = {
-    run_id: run.run_id, id_muestra: run.id_muestra, id_caso: run.id_caso, fecha_iso: run.fecha_iso,
-    volumen_ml: run.volumen_ml, config_id: run.config_id, estado: run.estado, origen: run.origen,
-    estado_hg: run.estado_hg || 'pendiente', demostracion: run.demostracion ? 'si' : 'no',
-    estacion: run.estacion, build: run.build, matriz: run.matriz, tipo_corrida: run.tipo_corrida, lote_tira: run.lote_tira,
-    sensor_optico: o.sensor || 'TCS34725', ganancia: o.ganancia || '', integracion_ms: o.integracion_ms ?? '',
-    referencia_delta: run.referencia?.tipo === 'blanco' ? `blanco ${run.referencia.run_id}` : 'inicio de la corrida (5 s)',
-    control_volumen: yesNo(run.volumen_confirmado), control_camara: yesNo(c.camara), control_tira: yesNo(c.tira),
-    control_sonda: yesNo(c.sondas), control_sensores: yesNo(c.sensores), control_blanco: c.blanco || '',
-    criterio_hg: crit ? `umbral ${crit.umbral} ± ${crit.banda} · ${crit.metodo} · ${crit.validado_por}` : 'sin criterio acordado',
-    motivo_hg: run.hg_tira?.motivo || '',
-    operador: run.operador, permiso_uso: run.permiso_uso,
-    incidencias: [run.incidencias, ...(run.motivos || [])].filter(Boolean).join(' | '),
+export function rowOf(m) {
+  const c = m.calculo || {}, l = m.laboratorio || {}, r = m.lecturas || {};
+  return {
+    codigo: m.codigo, matriz: m.matriz, cabezal: m.cabezal, fecha_iso: m.fecha_iso, lat: m.lat, lon: m.lon,
+    responsable: m.responsable, cuenca: m.cuenca,
+    c_ext_mg_l: c.c_ext_mg_l, v_ext_l: c.v_ext_l, m_humeda_kg: c.m_humeda_kg, m_tejido_kg: c.m_tejido_kg, f_seco: c.f_seco,
+    recuperacion_r: c.recuperacion_r, c_estimada_mg_kg: estimado(m)?.toFixed(4), base: c.base,
+    delta_e: r.delta_e, pico_ua: r.pico_ua, semaforo: m.semaforo, controles_fallidos: controlesFallidos(m).join(' | '),
+    calibracion: m.calibracion, firmware: m.firmware, certeza: m.certeza,
+    laboratorio: l.laboratorio, enviada_en: l.enviada_en, fecha_resultado: l.fecha_resultado, metodo_lab: l.metodo,
+    resultado_lab_mg_kg: l.resultado_mg_kg, base_lab: l.base, visibilidad: m.visibilidad,
+    alerta: m.alerta?.estado || '', demostracion: m.demostracion ? 'si' : 'no', etiqueta: ETIQUETA_LEGAL,
   };
-  const d = derive(run, rows);
+}
+
+export function buildCsv(list) {
   const lines = [COLUMNS.join(',')];
-  for (let seq = 0; seq < N_ROWS; seq++) {
-    const r = d[seq];
-    let motivo = r?.motivo || '';
-    if (!r) motivo = run.estado === 'captura' ? 'pendiente_de_recibir' : 'sin_recibir';
-    else if (r.c == null && !motivo) motivo = 'optica_invalida';
-    else if (r.temp_c == null && !motivo) motivo = 'temperatura_invalida';
-    const row = {
-      ...meta, seq, t_seg: r ? (r.t_seg ?? seq) : seq,
-      temp_c: num(r?.temp_c, 4), r: r?.r ?? '', g: r?.g ?? '', b: r?.b ?? '', c: r?.c ?? '',
-      delta_cromatico: num(r?.delta, 3), motivo,
-    };
-    lines.push(COLUMNS.map((k) => cell(row[k])).join(','));
-  }
+  for (const m of list) { const r = rowOf(m); lines.push(COLUMNS.map((k) => cell(r[k])).join(',')); }
   return '﻿' + lines.join('\r\n') + '\r\n';
 }
 
-export function csvFilename(run) {
-  const d = (run.fecha_iso || '').slice(0, 19).replace(/[:T]/g, '-');
-  const safe = (s) => String(s || '').replace(/[^\w.-]+/g, '_');
-  return `${safe(run.run_id)}_${safe(run.id_muestra)}_${d}${run.demostracion ? '_DEMOSTRACION' : ''}.csv`;
+/** Lee un CSV con la misma cabecera (exportado por la app modo técnico o por esta web). */
+export function parseCsv(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; continue; }
+    if (ch === '"') q = true; else if (ch === ',') { row.push(cur); cur = ''; } else if (ch === '\n') { row.push(cur.replace(/\r$/, '')); rows.push(row); row = []; cur = ''; } else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  const [head, ...body] = rows.filter((r) => r.some((x) => x !== ''));
+  const n = (v) => (v === '' || v == null ? null : Number(v));
+  return body.map((r) => {
+    const o = Object.fromEntries(head.map((k, i) => [k, r[i] ?? '']));
+    return {
+      codigo: o.codigo, matriz: o.matriz, cabezal: o.cabezal, fecha_iso: o.fecha_iso, lat: n(o.lat), lon: n(o.lon),
+      responsable: o.responsable, cuenca: o.cuenca,
+      calculo: { c_ext_mg_l: n(o.c_ext_mg_l), v_ext_l: n(o.v_ext_l), m_humeda_kg: n(o.m_humeda_kg), m_tejido_kg: n(o.m_tejido_kg), f_seco: n(o.f_seco), recuperacion_r: n(o.recuperacion_r), c_estimada_mg_kg: n(o.c_estimada_mg_kg), base: o.base },
+      lecturas: { delta_e: n(o.delta_e), pico_ua: n(o.pico_ua) },
+      semaforo: SEMAFORO[o.semaforo] ? o.semaforo : 'invalido', controles: {}, calibracion: o.calibracion, firmware: o.firmware,
+      certeza: CERTEZA[o.certeza] ? o.certeza : 'cribado',
+      laboratorio: { laboratorio: o.laboratorio || undefined, enviada_en: o.enviada_en || undefined, fecha_resultado: o.fecha_resultado || undefined, metodo: o.metodo_lab || undefined, resultado_mg_kg: n(o.resultado_lab_mg_kg), base: o.base_lab || undefined },
+      visibilidad: o.visibilidad === 'publico' ? 'publico' : 'restringido', demostracion: o.demostracion === 'si',
+    };
+  }).filter((m) => m.codigo);
+}
+
+/** GeoJSON (formato geográfico para QGIS u otros SIG). `publico`: solo zonas agregadas y sin responsables. */
+export function buildGeoJson(list, { publico = false } = {}) {
+  const features = [];
+  for (const m of list) {
+    if (m.lat == null || m.lon == null) continue;
+    if (publico && m.visibilidad !== 'publico') continue;
+    const props = rowOf(m);
+    let geometry;
+    if (publico) {
+      const z = zonaPublica(m.lat, m.lon);
+      geometry = { type: 'Polygon', coordinates: [[[z.lon_min, z.lat_min], [z.lon_max, z.lat_min], [z.lon_max, z.lat_max], [z.lon_min, z.lat_max], [z.lon_min, z.lat_min]]] };
+      for (const k of ['lat', 'lon', 'responsable', 'c_ext_mg_l', 'v_ext_l', 'm_humeda_kg', 'm_tejido_kg', 'f_seco', 'recuperacion_r', 'delta_e', 'pico_ua', 'firmware', 'laboratorio']) delete props[k];
+      props.zona = 'Celda de 0,1° (~11 km): la ubicación exacta solo la ven las autoridades.';
+    } else geometry = { type: 'Point', coordinates: [m.lon, m.lat] };
+    features.push({ type: 'Feature', geometry, properties: props });
+  }
+  return JSON.stringify({ type: 'FeatureCollection', name: publico ? 'ahgora_publico' : 'ahgora_muestras', features }, null, 1);
 }
 
 export function downloadText(text, filename, type = 'text/csv;charset=utf-8') {
   const blob = new Blob([text], { type });
-  downloadBlob(blob, filename);
-}
-export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.rel = 'noopener';
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
+export const stamp = (demo) => `${new Date().toISOString().slice(0, 10)}${demo ? '_DEMOSTRACION' : ''}`;

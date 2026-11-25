@@ -1,15 +1,15 @@
 import './styles/app.css';
-import { state, emit } from './state.js';
-import { createApi } from './api.js';
-import { loadRuns, startStatusLoop } from './runs.js';
+import { state, emit, setMode, readPref } from './state.js';
+import { loadMuestras } from './data.js';
 import { createShell, setCurrent } from './components/shell.js';
 import { mapaView } from './views/mapa.js';
-import { lecturasView } from './views/lecturas.js';
-import { evidenciaView } from './views/evidencia.js';
-import { estacionesView } from './views/estaciones.js';
-import { laboratorioView } from './views/laboratorio.js';
-import { reportesView } from './views/reportes.js';
-import { bioindicadorView, loadLemna } from './views/bioindicador.js';
+import { muestrasView } from './views/muestras.js';
+import { muestraView } from './views/muestra.js';
+import { priorizacionView } from './views/priorizacion.js';
+import { cuencaView } from './views/cuenca.js';
+import { indicadoresView } from './views/indicadores.js';
+import { alertasView } from './views/alertas.js';
+import { metodoView } from './views/metodo.js';
 import { configuracionView } from './views/configuracion.js';
 
 // Popover API: los navegadores sin soporte muestran las fichas como hojas fijas (ver CSS @supports).
@@ -17,33 +17,30 @@ if (!Object.hasOwn(HTMLElement.prototype, 'popover')) {
   console.warn('Este navegador no soporta popover: las fichas se abrirán como hojas fijas.');
 }
 
-// ---------------- modo: demostración o estación real
+// ---------------- origen de los datos: demostración o Servidor Ahgora
 function resolveMode() {
   const q = new URLSearchParams(location.search).get('demo');
   if (q === '1') return 'demo';
-  if (q === '0') return 'device';
-  try { const saved = JSON.parse(localStorage.getItem('hg.mode') || 'null'); if (saved) return saved; } catch { /* sin almacenamiento */ }
-  // Web publicada (GitHub Pages / Vercel): sin placa, arranca en demostración. Web del ESP32: estación real.
-  return import.meta.env.DEV || import.meta.env.VITE_TARGET === 'cloud' ? 'demo' : 'device';
+  if (q === '0') return 'nube';
+  return readPref('ahg.mode', 'demo') === 'nube' ? 'nube' : 'demo';
 }
-state.mode = resolveMode();
-state.api = createApi(state.mode);
+setMode(resolveMode());
 document.documentElement.dataset.mode = state.mode;
 
-// ---------------- rutas
+// ---------------- rutas (#/vista/parámetro)
 const ROUTES = {
   mapa: mapaView,
-  estaciones: estacionesView,
-  lecturas: lecturasView,
-  evidencia: evidenciaView,
-  laboratorio: laboratorioView,
-  reportes: reportesView,
-  bioindicador: bioindicadorView,
-  // Vistas con internet: se descargan solo al abrirlas (geotiff.js va en su propio fragmento).
-  satelite: () => import('./views/satelite.js').then((m) => m.sateliteView()),
-  espacial: () => import('./views/espacial.js').then((m) => m.espacialView()),
+  muestras: muestrasView,
+  muestra: muestraView,
+  priorizacion: priorizacionView,
+  cuenca: cuencaView,
+  indicadores: indicadoresView,
+  alertas: alertasView,
+  metodo: metodoView,
   configuracion: configuracionView,
 };
+const NAV_OF = { muestra: 'muestras' };
+const TITLES = { mapa: 'Mapa de muestras' };
 
 let current = null;
 function route(initial = false) {
@@ -51,31 +48,18 @@ function route(initial = false) {
   const view = ROUTES[name] ? name : 'mapa';
   current?.destroy?.();
   const main = document.getElementById('main');
-  const made = ROUTES[view](param ? decodeURIComponent(param) : undefined);
-  const token = (route.token = (route.token || 0) + 1);
-  if (made instanceof Promise) {
-    current = null;
-    main.replaceChildren(Object.assign(document.createElement('p'), { className: 'view meta', textContent: 'Cargando vista…' }));
-    made.then((v) => { if (token !== route.token) return; current = v; main.replaceChildren(v.el); finish(view, initial); })
-      .catch(() => main.replaceChildren(Object.assign(document.createElement('p'), { className: 'view meta', textContent: 'Esta vista necesita internet y no se carga desde la estación. Ábrela en un equipo con conexión, con la copia completa de la web (carpeta dist/). La estación sigue funcionando.' })));
-    setCurrent(view);
-    return;
-  }
-  current = made;
+  current = ROUTES[view](param ? decodeURIComponent(param) : undefined);
   main.replaceChildren(current.el);
-  finish(view, initial);
-}
-function finish(view, initial) {
-  const main = document.getElementById('main');
-  setCurrent(view);
-  document.title = `${view === 'mapa' ? 'Mapa de monitoreo' : main.querySelector('[data-view-title]')?.textContent || 'Hg-Guard'} · Estación de monitoreo`;
+  setCurrent(NAV_OF[view] || view);
+  document.title = `${TITLES[view] || main.querySelector('[data-view-title]')?.textContent || 'Ahgora'} · Ahgora Web`;
   if (!initial) (main.querySelector('[data-view-title]') || main).focus({ preventScroll: false });
+  if (!initial) document.querySelector('.app-body')?.scrollTo({ top: 0 });
 }
 window.addEventListener('hashchange', () => route());
 
 // ---------------- arranque
 createShell();
 route(true);
-loadRuns().then(() => emit('mode'));
-loadLemna();
-startStatusLoop();
+loadMuestras()
+  .then(() => emit('mode'))
+  .catch((e) => { console.error(e); document.getElementById('main').prepend(Object.assign(document.createElement('p'), { className: 'form-error view', textContent: `No se pudieron cargar las muestras: ${e.message}` })); });

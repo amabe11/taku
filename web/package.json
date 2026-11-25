@@ -1,15 +1,14 @@
 {
-  "name": "hg-guard-web-local",
+  "name": "ahgora-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Web local de la estación Hg-Guard (ESP32, sin internet)",
+  "description": "Ahgora Web: sitio para autoridades y laboratorios (mapa de muestras, priorización, cuenca, capas NASA)",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/esp32-pack.mjs",
+    "build": "vite build",
     "preview": "vite preview --host",
     "map": "node scripts/build-map.mjs",
-    "mock": "node scripts/mock-esp32.mjs",
     "deploy:pages": "node scripts/deploy-pages.mjs"
   },
   "devDependencies": {
@@ -18,8 +17,5 @@
     "@tailwindcss/vite": "^4.3.5",
     "tailwindcss": "^4.3.5",
     "vite": "^8.3.8"
-  },
-  "dependencies": {
-    "geotiff": "^3.0.5"
   }
 }

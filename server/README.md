@@ -1,10 +1,10 @@
-# API en la nube de Hg-Guard (MongoDB)
+# Servidor Ahgora (API + MongoDB)
 
 Desplegada en **https://taku-server.vercel.app** (estado en `/api/health`).
 
-Guarda en **MongoDB Atlas** las corridas de la estación (con sus 121 filas), las observaciones del bioindicador Lemna
-y los manifiestos satelitales. La web los guarda primero en el navegador y los copia aquí con
-**Configuración → Nube del equipo → Sincronizar**.
+Base de datos central de Ahgora (secciones 3 y 7.6 de la guía): reúne las **muestras** que sincroniza la app modo
+técnico y las confirmaciones de laboratorio, alertas aprobadas y visibilidad que agrega Ahgora Web. Desde aquí los
+datos van a Ahgora Web (autoridades) y, solo lo aprobado y en zonas agregadas, a Ahgora Comunidad.
 
 | Pieza | Servicio | Costo |
 |---|---|---|
@@ -20,10 +20,12 @@ y los manifiestos satelitales. La web los guarda primero en el navegador y los c
 | Ruta | Método | Clave | Qué hace |
 |---|---|---|---|
 | `/` y `/api/health` | GET | No | Estado de la API y ping a MongoDB |
-| `/api/sync` | POST | `x-hg-key` | Inserta o actualiza por `run_id` (corridas) o `id` (Lemna, escenas). Repetir no duplica |
-| `/api/datos?coleccion=corridas\|lemna\|escenas[&id=][&filas=1]` | GET | `x-hg-key` | Lista o detalle |
+| `/api/sync` | POST | `x-ahg-key` | `{ "muestras": [registro] }`: inserta o actualiza por `codigo`. Repetir no duplica |
+| `/api/datos?coleccion=muestras[&codigo=]` | GET | `x-ahg-key` | Lista o detalle, con ubicación exacta (solo equipo y autoridades) |
+| `/api/alertas` | GET | No | Para Ahgora Comunidad: solo mensajes **aprobados** de muestras **públicas**, con zona agregada (celda de 0,1°), sin coordenadas exactas ni responsables |
 
-Colecciones: `corridas` (metadatos + `filas[]`), `lemna`, `escenas` (solo el manifiesto; las imágenes quedan en el navegador).
+Colección: `muestras` (el registro está documentado en [web/README.md](../web/README.md#registro-de-muestra-contrato-con-la-app-modo-técnico-y-el-firmware)).
+La cabecera antigua `x-hg-key` y la variable `HG_TEAM_KEY` siguen aceptándose para no romper el despliegue existente.
 
 ## Puesta en marcha (unos 10 minutos)
 
@@ -42,26 +44,28 @@ Colecciones: `corridas` (metadatos + `filas[]`), `lemna`, `escenas` (solo el man
 3. **Root Directory:** `server`. Framework: *Other*. Deja vacíos el *Build* y el *Output*.
 4. *Environment Variables*:
    - `MONGODB_URI` = la cadena del paso 1 (con la contraseña real).
-   - `HG_TEAM_KEY` = una clave larga que solo conozca el equipo, por ejemplo la salida de
+   - `AHG_TEAM_KEY` (o la ya existente `HG_TEAM_KEY`) = una clave larga que solo conozca el equipo, por ejemplo la salida de
      `node -e "console.log(crypto.randomUUID())"`.
 5. *Deploy*. Comprueba `https://<tu-proyecto>.vercel.app/api/health` → `{"ok":true,…}`.
 
-### 3. Conectar la web
+### 3. Conectar la web y la app
 
-- En la web publicada (o en la del ESP32, si hay internet): **Configuración → Nube del equipo** → dirección
-  `https://<tu-proyecto>.vercel.app` + la clave del equipo → *Probar conexión* → *Sincronizar con la nube*.
-- Para dejar la dirección preconfigurada en la web pública:
-  `VITE_CLOUD_API=https://<tu-proyecto>.vercel.app npm run deploy:pages` (desde `web/`). La clave nunca se publica.
+- Ahgora Web: **Configuración → Servidor Ahgora** → dirección `https://<tu-proyecto>.vercel.app` + clave del equipo →
+  *Probar conexión*, y origen de datos «Servidor Ahgora».
+- App modo técnico: `POST /api/sync` con la cabecera `x-ahg-key` y `{ "muestras": [ … ] }` cuando haya señal.
+- Ahgora Comunidad: `GET /api/alertas` (sin clave).
+- Dirección preconfigurada en la web pública: `VITE_CLOUD_API=https://<tu-proyecto>.vercel.app npm run deploy:pages`
+  (desde `web/`). La clave nunca se publica.
 
 ## Probar en local
 
 ```bash
 cd server && npm install
-MONGODB_URI="mongodb+srv://…" HG_TEAM_KEY="clave" npm run dev     # http://localhost:3001/api/health
+MONGODB_URI="mongodb+srv://…" AHG_TEAM_KEY="clave" npm run dev     # http://localhost:3001/api/health
 ```
 
 ## Seguridad
 
 - Las cadenas de conexión y la clave **solo** van en las variables de entorno de Vercel. Nunca en el código ni en el repositorio.
 - Sin la clave nadie puede leer ni escribir datos; `/api/health` no expone datos.
-- Para cambiar la clave, edita `HG_TEAM_KEY` en Vercel y redespliega (*Redeploy*).
+- Para cambiar la clave, edita `AHG_TEAM_KEY` (o `HG_TEAM_KEY`) en Vercel y redespliega (*Redeploy*).

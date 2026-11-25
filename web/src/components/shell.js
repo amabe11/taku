@@ -1,29 +1,26 @@
-// Sidebar (escritorio/tablet), barra superior y cajón de navegación (teléfono), banners de modo.
+// Ahgora Web: barra lateral (escritorio/tablet), barra superior y cajón (teléfono), banners de modo.
 import { h, mount } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { state, on, writePref } from '../state.js';
-import { connectionPill } from './badges.js';
 
 export const NAV = [
-  { caption: 'Operación', items: [
-    ['mapa', 'Mapa de monitoreo', 'map'],
-    ['estaciones', 'Estaciones', 'station'],
-    ['lecturas', 'Lecturas', 'readings'],
-    ['bioindicador', 'Bioindicador Lemna', 'drop'],
-    ['evidencia', 'Evidencia', 'evidence'],
-    ['laboratorio', 'Laboratorio', 'lab'],
-    ['reportes', 'Reportes', 'reports'],
+  { caption: 'Decidir', items: [
+    ['mapa', 'Mapa de muestras', 'map'],
+    ['muestras', 'Muestras', 'table'],
+    ['priorizacion', 'Cola de priorización', 'queue'],
+    ['cuenca', 'Vista de cuenca', 'river'],
+    ['indicadores', 'Indicadores', 'gauge'],
+    ['alertas', 'Alertas comunitarias', 'bell'],
   ] },
-  { caption: 'Territorio', items: [
-    ['satelite', 'Imágenes satelitales', 'satellite', 'con internet'],
-    ['espacial', 'Análisis espacial', 'spatial', 'con internet'],
+  { caption: 'Transparencia', items: [
+    ['metodo', 'Método y límites', 'book'],
   ] },
   { caption: null, items: [['configuracion', 'Configuración', 'settings']] },
 ];
 
 const brand = () => h('div', { class: 'brand' },
-  h('span', { class: 'logo-slot', 'aria-hidden': 'true' }, 'Logo'),
-  h('div', { class: 'brand-text' }, h('div', { class: 'brand-title' }, 'Estación de monitoreo'), h('div', { class: 'brand-sub' }, 'Hg-Guard · ORO-4.1')));
+  h('span', { class: 'logo-mark', 'aria-hidden': 'true' }, 'A', h('b', null, 'Hg')),
+  h('div', { class: 'brand-text' }, h('div', { class: 'brand-title' }, 'Ahgora Web'), h('div', { class: 'brand-sub' }, 'Cribado de mercurio · ORO-4.1')));
 
 function navList(onNavigate) {
   const frag = [];
@@ -63,7 +60,7 @@ export function createShell() {
   };
   const collapse = h('button', {
     class: 'collapse-btn', type: 'button', 'aria-controls': 'sidebar',
-    onclick: () => { state.ui.sidebar = app.dataset.sidebar === 'expanded' ? 'collapsed' : 'expanded'; writePref('hg.sidebar', state.ui.sidebar); applySidebar(); },
+    onclick: () => { state.ui.sidebar = app.dataset.sidebar === 'expanded' ? 'collapsed' : 'expanded'; writePref('ahg.sidebar', state.ui.sidebar); applySidebar(); },
   }, icon('collapse'), h('span', { class: 'collapse-label' }, 'Contraer menú'));
   const footMode = h('div', { class: 'foot-text' });
   const nav = h('nav', { 'aria-label': 'Principal' }, navList());
@@ -100,12 +97,13 @@ export function createShell() {
     scroller.addEventListener('scroll', () => drawer.style.setProperty('--drawer-backdrop', String(1 - scroller.scrollLeft / sheet.offsetWidth)));
   }
 
-  // ---------------- banners de modo y conexión
+  // ---------------- banners de modo y servidor
   const banner = document.getElementById('demo-banner');
   function renderMode() {
-    mount(topPill, connectionPill(state.conn.status));
+    const n = state.nube;
+    mount(topPill, modePill());
     mount(footMode,
-      state.mode === 'demo' ? 'Modo demostración' : 'Estación EST-01',
+      state.mode === 'demo' ? 'Modo demostración' : 'Servidor Ahgora',
       state.persistent ? null : h('div', { style: { color: 'var(--state-warn)' } }, 'Sin almacenamiento local: exporta antes de cerrar.'),
     );
     if (state.mode === 'demo') {
@@ -113,25 +111,30 @@ export function createShell() {
       banner.className = 'demo-banner';
       mount(banner, icon('beaker_demo', { cls: 'shrink-0 w-5 h-5 text-hg-warn' }),
         h('span', null, h('strong', null, 'Demostración'),
-          h('span', { class: 'banner-long' }, ' — estación simulada; los datos son archivo de prueba, no mediciones reales.'),
-          h('span', { class: 'banner-short' }, ': datos simulados, no mediciones reales.')),
-        h('button', { class: 'link-btn', type: 'button', onclick: () => switchMode('device') }, 'Usar la estación real'));
-    } else if (state.conn.status === 'offline') {
+          h('span', { class: 'banner-long' }, ' — muestras, comunidades y resultados de laboratorio ficticios. No son mediciones reales.'),
+          h('span', { class: 'banner-short' }, ': datos ficticios, no mediciones reales.')),
+        h('button', { class: 'link-btn', type: 'button', onclick: () => switchMode('nube') }, 'Usar el servidor'));
+    } else if (n.status === 'error' || n.status === 'sin_config') {
       banner.hidden = false;
       banner.className = 'offline-banner';
       mount(banner, icon('wifi_off', { cls: 'shrink-0 w-5 h-5 text-hg-muted' }),
-        h('span', null, h('strong', null, 'Sin conexión con la estación. '),
-          h('span', { class: 'banner-long' }, 'Conecta el teléfono a la red Wi-Fi de la estación y abre la IP que imprime la placa. Las corridas guardadas siguen disponibles.'),
-          h('span', { class: 'banner-short' }, 'Únete a la red Wi-Fi de la estación.')),
-        h('button', { class: 'link-btn', type: 'button', onclick: () => switchMode('demo') }, 'Usar modo demostración'));
+        h('span', null, h('strong', null, n.status === 'sin_config' ? 'Servidor sin configurar. ' : 'Sin conexión con el servidor. '),
+          h('span', { class: 'banner-long' }, n.mensaje)),
+        h('a', { class: 'link-btn', href: '#/configuracion' }, 'Configurar'));
     } else banner.hidden = true;
   }
-  on('conn', renderMode); on('mode', renderMode);
+  function modePill() {
+    if (state.mode === 'demo') return h('span', { class: 'pill', dataset: { conn: 'demo' } }, icon('beaker_demo'), h('span', { class: 'pill-text' }, 'Demostración'));
+    const st = state.nube.status;
+    const m = { ok: ['online', 'wifi', 'Servidor'], sync: ['checking', 'sync', 'Sincronizando…'], error: ['offline', 'wifi_off', 'Sin servidor'], sin_config: ['offline', 'wifi_off', 'Sin servidor'], idle: ['checking', 'sync', 'Servidor'] }[st] || ['offline', 'wifi_off', 'Servidor'];
+    return h('span', { class: 'pill', dataset: { conn: m[0] } }, icon(m[1]), h('span', { class: 'pill-text' }, m[2]));
+  }
+  on('nube', renderMode); on('mode', renderMode);
   renderMode();
 }
 
 export function switchMode(mode) {
-  writePref('hg.mode', mode);
+  writePref('ahg.mode', mode);
   const url = new URL(location.href);
   url.searchParams.delete('demo');
   location.replace(url);

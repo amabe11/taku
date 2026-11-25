@@ -20,12 +20,12 @@ writeFileSync(join(out, '.nojekyll'), ''); // sirve tal cual (sin procesar con J
 
 const origin = execSync('git remote get-url origin', { cwd: web }).toString().trim();
 const sha = execSync('git rev-parse --short HEAD', { cwd: web }).toString().trim();
-const tmp = mkdtempSync(join(tmpdir(), 'hg-pages-'));
+const tmp = mkdtempSync(join(tmpdir(), 'ahgora-pages-'));
 cpSync(out, tmp, { recursive: true });
 const g = (cmd) => execSync(cmd, { cwd: tmp, stdio: 'inherit' });
 g('git init -q -b gh-pages');
 g('git add -A');
-g(`git -c user.name="hg-guard-deploy" -c user.email="deploy@users.noreply.github.com" commit -q -m "Publicación de la web (${sha})"`);
+g(`git -c user.name="ahgora-deploy" -c user.email="deploy@users.noreply.github.com" commit -q -m "Publicación de la web (${sha})"`);
 g(`git push -q -f ${origin} gh-pages`);
 rmSync(tmp, { recursive: true, force: true });
 console.log(`\nPublicado en la rama gh-pages desde ${sha}.`);
