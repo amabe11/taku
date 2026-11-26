@@ -2,13 +2,15 @@
 // Variables de entorno (se configuran en Vercel, nunca en el repositorio):
 //   MONGODB_URI                    cadena de conexión de Atlas (mongodb+srv://…)
 //   AHG_TEAM_KEY (o HG_TEAM_KEY)   clave del equipo; se envía en la cabecera «x-ahg-key» para leer o escribir
-//   AHG_DB                         nombre de la base (opcional; por defecto «ahgora»). La base antigua «hgguard»
-//                                  (estaciones y corridas de Hg-Guard) queda intacta y ya no se usa.
+//   AHG_DB                         nombre de la base (opcional; por defecto «ahgora»; si el usuario de Atlas no tiene
+//                                  permiso sobre ella, se usa «hgguard», con la estructura nueva junto a las colecciones
+//                                  viejas de Hg-Guard, que no se tocan ni se leen).
 import { createHash } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { inicializar } from './esquema.js';
 
 export const BASE_POR_DEFECTO = 'ahgora';
+export const BASE_RESPALDO = 'hgguard';
 let clientPromise = globalThis.__ahgMongo;
 export async function db() {
   if (!process.env.MONGODB_URI) throw Object.assign(new Error('Falta MONGODB_URI en las variables de entorno'), { status: 500 });
@@ -18,17 +20,31 @@ export async function db() {
       .catch((e) => { globalThis.__ahgMongo = clientPromise = null; throw e; });
   }
   const client = await clientPromise;
-  const d = client.db(process.env.AHG_DB || BASE_POR_DEFECTO);
-  // Colecciones con validador e índices antes de la primera escritura (una vez por arranque en frío).
-  // Si falla (p. ej. el usuario de Atlas no puede crear colecciones con validador), la API sigue funcionando y
-  // /api/health informa el motivo.
-  if (!globalThis.__ahgInit) {
-    globalThis.__ahgInit = inicializar(d)
-      .then(() => { globalThis.__ahgInitError = null; })
-      .catch((e) => { globalThis.__ahgInitError = { codigo: e.codeName || e.code || 'error', mensaje: String(e.message).slice(0, 200) }; setTimeout(() => { globalThis.__ahgInit = null; }, 60000); });
+  // Base elegida una vez por arranque en frío: la preferida («ahgora» o AHG_DB) y, si el usuario de Atlas no tiene
+  // permiso sobre ella, la base histórica «hgguard» (donde el usuario sí puede escribir) con la estructura nueva.
+  if (!globalThis.__ahgBase) globalThis.__ahgBase = elegirBase(client).catch((e) => { globalThis.__ahgBase = null; throw e; });
+  return client.db(await globalThis.__ahgBase);
+}
+
+const sinPermiso = (e) => /not (allowed|authorized)|unauthorized/i.test(`${e?.codeName} ${e?.message}`);
+async function elegirBase(client) {
+  const candidatas = [process.env.AHG_DB || BASE_POR_DEFECTO];
+  if (!process.env.AHG_DB) candidatas.push(BASE_RESPALDO);
+  globalThis.__ahgInitError = null;
+  for (const nombre of candidatas) {
+    try {
+      // Colecciones con validador e índices antes de la primera escritura.
+      await inicializar(client.db(nombre));
+      globalThis.__ahgAviso = nombre === BASE_RESPALDO
+        ? `Sin permiso sobre «${BASE_POR_DEFECTO}» en Atlas: se usa «${BASE_RESPALDO}» con la estructura nueva. Para separar, da al usuario de Atlas el rol «Read and write to any database».`
+        : null;
+      return nombre;
+    } catch (e) {
+      globalThis.__ahgInitError = { base: nombre, codigo: e.codeName || e.code || 'error', mensaje: String(e.message).slice(0, 200) };
+      if (!sinPermiso(e)) return nombre; // otro problema: se usa igual y /api/health lo informa
+    }
   }
-  await globalThis.__ahgInit;
-  return d;
+  return candidatas.at(-1);
 }
 
 /** CORS abierto: la protección es la clave del equipo (no hay cookies). */
