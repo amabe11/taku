@@ -17,19 +17,31 @@ Caja Ahgora (ESP32 + cabezal SED o PEZ) ─Bluetooth─► App Android modo téc
 > - Un verde **no** significa «libre de mercurio»; la versión 1 probablemente no detecta sedimentos de 0,17–0,5 mg/kg.
 > - Los satélites **no detectan mercurio**: aportan contexto.
 
+## Sitio piloto: Alcoche (Caranavi, La Paz)
+
+Desde el 25 nov 2026 la web se centra en **Alcoche**, comunidad de 775 habitantes sobre el **río Coroico**
+(15,751° S, 67,675° O), en la ruta Caranavi–Guanay. Hay minería aurífera nueva junto al río: 76 parches con huella
+minera a menos de 10 km, casi todos desde 2021 (Amazon Mining Watch). La AJAM inspeccionó la zona en octubre de 2025
+y el Concejo de Caranavi denunció más de 60 operaciones ilegales en Alcoche y Santa Fe (octubre de 2026). **No hay
+mediciones públicas de mercurio en Alcoche**: las cifras de la vista «Sitio Alcoche» son de la cuenca del Beni.
+
+- **Real:** ubicación, ríos y localidades (OpenStreetMap), eje Coroico → Kaka, huellas mineras (Amazon Mining Watch),
+  antecedentes, caudal, suelo y peces (APIs abiertas).
+- **Simulado** (`demostracion: true`, sello «Demostración»): las 25 muestras y sus lecturas del ESP32, los resultados
+  de laboratorio y el estado legal de las cooperativas marcadas «ficticia». Solo dos estados legales tienen respaldo
+  público: el frente de Alcoche (inspección de la AJAM) y los de Santa Fe (denuncia).
+
 ## Vistas
 
-| Menú | Qué hace (guía) |
+| Menú | Qué hace |
 |---|---|
-| Mapa de muestras | Mapa interactivo: color = semáforo, forma = matriz, anillo = certeza. Filtros por matriz, fecha, cuenca, estado y responsable. Capas NASA GIBS. Eje de cuenca, comunidades y frentes mineros |
-| Muestras | Tabla ordenable y filtrable. Exporta CSV, GeoJSON y una **versión pública** (solo muestras públicas, en celdas de 0,1°, sin responsables) |
-| Ficha de muestra (`#/muestra/<código>`) | Trazabilidad completa: quién, cuándo, dónde, controles, calibración, cálculo C_sed/C_pez, lecturas crudas, laboratorio, cuenca, lluvia previa (NASA POWER). Acciones: enviar al laboratorio, cargar resultado, visibilidad, imprimir/PDF |
-| Cola de priorización | Lista ordenada para el laboratorio con reglas a la vista: semáforo → población aguas abajo → estimado frente a la referencia → antigüedad |
-| Vista de cuenca | Perfil aguas arriba (posibles fuentes) / aguas abajo (posibles expuestos) de una muestra |
-| Indicadores | Muestras, % por color y matriz, tiempos, desempeño frente al laboratorio (sensibilidad, falsos negativos, especificidad, correlación) con aviso de pocos datos |
-| Alertas comunitarias | Política de alertas (7.2). Un responsable revisa y aprueba cada mensaje; vista previa de lo que ve la comunidad |
-| Método y límites | Qué podemos afirmar y qué no (8), sensibilidad (4.7), capas NASA (7.4), roles y privacidad (7.7), plan de validación (9) |
-| Configuración | Origen de datos (demostración o servidor), clave del equipo, importar JSON/CSV, respaldo |
+| Mapas: muestras y MAPE | **Dos mapas del mismo territorio**, que se pueden mover juntos. *Muestras*: color = semáforo, forma = matriz, anillo = certeza. *MAPE*: unidades mineras por estado legal (verde papeles al día · amarillo en trámite · rojo ilegal o presunta ilegal), huellas satelitales de 480 m e intensidad minera (indicador indirecto del uso de mercurio). Sentinel-2 2025 y 2018 para comparar, y capas NASA GIBS |
+| Sitio Alcoche | Por qué empezar aquí: ficha del lugar, huella minera por año, caudal del Coroico hoy (GloFAS) y lluvia, suelo (SoilGrids), peces de la cuenca (GBIF), antecedentes con su tipo de fuente y plan de muestreo |
+| Minería (MAPE) | Registro de unidades mineras con estado legal, base del estado (AJAM, denuncia, presunción satelital) y muestras cercanas. Fuentes y carga del registro oficial (JSON, CSV o GeoJSON) |
+| Muestras · ficha | Tabla y ficha de cada muestra: lecturas crudas del ESP32 (casillas de color reconstruidas del RGBC, o el voltamograma del cabezal PEZ), cálculo C_sed/C_pez, laboratorio, minería a 5 km, caudal del día |
+| Cola de laboratorio · Vista de cuenca · Indicadores | Igual que antes, sobre el eje real Coroico → Kaka y la población de OSM |
+| Avisos y reportes comunitarios | Aprobación de avisos (estados públicos de la guía definitiva, sección 05) y reportes voluntarios |
+| Configuración y servidor | Origen de datos, clave del equipo, **estado de la base**, «Preparar base y cargar simulación», «Borrar simulación» |
 
 ## Desarrollo
 
@@ -56,8 +68,10 @@ Campos de la sección 7.6 + lo que el ESP32 envía por Bluetooth (6.1). La app l
   "fecha_iso": "2026-11-24T14:02:11-04:00",
   "lat": -15.83, "lon": -67.57,
   "responsable": "Técnico de campo 1",
-  "cuenca": "Nombre de la cuenca",
-  "muestreo": { "tipo": "compuesta", "porciones": 8, "profundidad_cm": 5, "fino_pct": 35, "observaciones": "" },
+  "cuenca": "Río Coroico → Kaka · Alcoche (Caranavi)",
+  "sitio": "alcoche",
+  "muestreo": { "tipo": "compuesta", "porciones": 8, "profundidad_cm": 5, "fino_pct": 35, "lugar": "cerca de Alcoche", "observaciones": "" },
+  // PEZ: { "especie": "Pseudoplatystoma fasciatum", "nombre_comun": "Surubí", "gremio": "depredador", "talla_cm": 44, "porcion": "músculo dorsal sin piel" }
   "lecturas": {                              // crudas del sensor
     "n_promedio": 10, "ganancia": "4x", "integracion_ms": 154,
     "referencia_blanca": { "r": 21480, "g": 23310, "b": 20120, "c": 65000 },
@@ -85,34 +99,46 @@ Campos de la sección 7.6 + lo que el ESP32 envía por Bluetooth (6.1). La app l
 - Si falta `c_estimada_mg_kg`, la web lo recalcula con la fórmula cuando están todos los términos.
 - CSV de exportación/importación: UTF-8 con BOM, coma, punto decimal, hora ISO; cabecera en `src/csv.js` (`COLUMNS`).
 
-## Capas NASA (GIBS, WMS EPSG:4326, sin registro)
+## Datos abiertos conectados (sin registro, verificados el 25 nov 2026)
 
-Verificadas el 2026-11-24 sobre los Yungas: `HLS_S30_Nadir_BRDF_Adjusted_Reflectance`, `HLS_L30_…`,
-`Landsat_WELD_CorrectedReflectance_TrueColor_Global_Annual`, `IMERG_Precipitation_Rate`,
-`VIIRS_SNPP_Thermal_Anomalies_375m_All` (sin fecha: los focos más recientes), `MODIS_Combined_Flood_2-Day`,
-`SRTM_Color_Index`, `GPW_Population_Density_2020`. El mapa propio (Natural Earth, proyección lineal en lon/lat) pide
-una imagen WMS del recuadro visible y la coloca exacta encima. Enlaces a NASA Worldview desde la ficha. Lluvia por
-punto: NASA POWER (`PRECTOTCORR`, rotulado como «no es IMERG»).
+| Fuente | Para qué | Cómo |
+|---|---|---|
+| Amazon Mining Watch (Earth Genome, CC BY 4.0) | Huellas de minería aurífera 2018–2026 | Extracto del sitio en `src/data/alcoche-geo.js` (`npm run alcoche`) |
+| OpenStreetMap (ODbL) | Ríos, localidades y población | Extracto vía Overpass en `src/data/alcoche-geo.js` |
+| Sentinel-2 cloudless (EOX, Copernicus) | Imagen de 10 m, 2025 y 2018 | WMS EPSG:4326 en el mapa |
+| NASA GIBS | HLS, Landsat, IMERG, FIRMS, inundaciones, SRTM, GPW | WMS EPSG:4326 en el mapa |
+| GloFAS (Copernicus) vía Open-Meteo | Caudal del Coroico: 30 días + pronóstico, y el día de cada muestra | `flood-api.open-meteo.com`, toma la celda del cauce principal |
+| ERA5 / Open-Meteo y NASA POWER | Lluvia | API por punto |
+| SoilGrids 2.0 (ISRIC) | Arcilla, arena, carbono y pH (el Hg viaja con la arcilla) | `rest.isric.org` |
+| GBIF | Peces registrados en la cuenca, para elegir especies del cabezal PEZ | `api.gbif.org` |
+
+No hay API pública del estado legal de cada cooperativa: la AJAM entrega su catastro minero por solicitud. Por eso el
+registro MAPE se carga desde la web y se cruza con las huellas satelitales. «Presunta ilegal» es una hipótesis para
+verificar, nunca una acusación.
 
 ## Estructura
 
 ```
 src/
-  model.js          semáforo, certeza, cálculo C_sed/C_pez, cola, cuenca, indicadores, alertas, zona pública
-  data/demo.js      muestras, cuenca, comunidades y frentes ficticios
+  model.js          semáforo, certeza, cálculo C_sed/C_pez, cola, cuenca, indicadores, alertas, zona pública, estado legal MAPE
+  data/alcoche.js   sitio piloto, cuenca real, zonas, antecedentes
+  data/alcoche-geo.js  extracto de OSM y Amazon Mining Watch (generado)
+  data/simulacion.js   simulador del lector ESP32 (TCS34725 y voltametría); lo usa también server/scripts/simular-esp32.mjs
+  data/demo.js      campaña simulada de 25 muestras y registro MAPE de demostración
   data.js, store.js origen de datos (demostración / servidor) y copia local en IndexedDB
   cloud.js          API del Servidor Ahgora (x-ahg-key)
   csv.js            CSV, GeoJSON, versión pública
   geo/apis.js       capas NASA GIBS y NASA POWER
   components/, views/
 scripts/
-  build-map.mjs (mapa base) · deploy-pages.mjs (GitHub Pages)
+  build-map.mjs (mapa base) · build-alcoche.mjs (datos del sitio) · deploy-pages.mjs (GitHub Pages)
 ```
 
 ## Pendiente
 
 - Acceso por rol con usuario y contraseña (hoy el servidor se protege con la clave del equipo).
-- Eje de cuenca real (trazado con SRTM), comunidades y población del sitio piloto (hoy solo en demostración).
+- Registro oficial de derechos mineros de la AJAM para el tramo Caranavi–Guanay (hoy: estados ficticios salvo Alcoche y Santa Fe).
+- Primeras mediciones reales en Alcoche con el laboratorio aliado.
 - Criterios de cribado finales por matriz con el laboratorio aliado y las autoridades (6.3).
 - Repetir la auditoría de accesibilidad (axe) sobre las vistas nuevas.
 

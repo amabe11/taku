@@ -75,7 +75,7 @@
   .ficha-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); border-bottom: 1px solid var(--color-border); padding-bottom: var(--sp-3); }
   .ficha-cols { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
   .print-area h3 { margin-bottom: var(--sp-2); }
-  .ficha-demo { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); background: var(--demo-stripe); border: 1px solid rgb(242 193 78 / 0.5); font-weight: 700; font-size: var(--fs-sm); }
+  .ficha-demo { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); background: var(--demo-stripe); border: 1px solid color-mix(in oklab, var(--state-demo) 50%, transparent); font-weight: 700; font-size: var(--fs-sm); }
   .limits { list-style: disc; margin: 0 0 var(--sp-2); padding-inline-start: 1.2em; font-size: var(--fs-sm); display: grid; gap: 4px; }
 }
 
@@ -84,10 +84,10 @@
   :root {
     color-scheme: light;
     --color-text: #111; --color-text-muted: #444; --color-text-faint: #555; --color-border: #bbb; --color-border-strong: #888;
-    --color-elevated: #fff; --color-panel: #fff; --color-bg: #fff; --chart-grid: #ddd; --chart-axis: #333; --chart-line: #5b2ed1; --color-accent-soft: #5b2ed1;
+    --color-elevated: #fff; --color-panel: #fff; --color-bg: #fff; --chart-grid: #ddd; --chart-axis: #333; --chart-line: #111; --color-accent-soft: #111;
   }
   html, body { background: #fff !important; color: #111; }
-  .sidebar, .topbar, .demo-banner, .offline-banner, .skip-link, .no-print, .view-head, #station-popup { display: none !important; }
+  .sidebar, .topbar, .demo-banner, .offline-banner, .skip-link, .no-print, .view-head, .station-popup { display: none !important; }
   .app, .app-body { display: block !important; height: auto !important; overflow: visible !important; }
   .view { padding: 0 !important; max-width: none; }
   .print-area { border: 0; padding: 0; background: #fff; color: #111; }

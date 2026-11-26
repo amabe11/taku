@@ -2,8 +2,14 @@
 // Servidor: copia local (IndexedDB) de lo que la app modo técnico sincronizó, más los cambios de la web.
 import { state, emit } from './state.js';
 import * as store from './store.js';
-import { demoMuestras } from './data/demo.js';
-import { cloudCfg, cloudReady, pullMuestras, pushMuestras } from './cloud.js';
+import { demoMuestras, demoMape } from './data/demo.js';
+import { cloudCfg, cloudReady, pullMuestras, pushMuestras, pullMape } from './cloud.js';
+import { readPref, writePref } from './state.js';
+
+// Sube esta versión cuando cambie la demostración: los navegadores con la anterior se vuelven a cargar.
+const DEMO_VERSION = 'alcoche-2026-11-25';
+const REFRESCO_MS = 60000;
+let timer = null;
 
 function setNube(status, mensaje = '') { state.nube = { ...state.nube, status, mensaje, ultima: cloudCfg().ultima }; emit('nube'); }
 
@@ -13,18 +19,28 @@ export async function loadMuestras() {
   store.useDb(state.mode);
   state.persistent = await store.ready();
   if (state.mode === 'demo') {
-    if (!(await store.listMuestras()).length) await store.putMuestras(demoMuestras());
+    if (readPref('ahg.demo.version', '') !== DEMO_VERSION || !(await store.listMuestras()).length) {
+      await store.clearMuestras();
+      await store.putMuestras(demoMuestras());
+      writePref('ahg.demo.version', DEMO_VERSION);
+    }
+    state.mape = demoMape();
+    emit('mape');
     return refresh();
   }
+  state.mape = readPref('ahg.mape.cache', []);
   await refresh();
   syncNube(); // en segundo plano: la web abre con la copia local
+  // Lo que llega de la app (o del simulador del lector) aparece sin recargar la página.
+  clearInterval(timer);
+  timer = setInterval(() => { if (document.visibilityState === 'visible') syncNube({ silencioso: true }); }, REFRESCO_MS);
 }
 
 /** Trae del servidor y envía los cambios locales pendientes. Lo nuevo del servidor no pisa cambios sin enviar. */
-export async function syncNube() {
+export async function syncNube({ silencioso = false } = {}) {
   if (state.mode !== 'nube') return;
   if (!cloudReady()) { setNube('sin_config', 'Falta la clave del equipo en Configuración.'); return; }
-  setNube('sync', 'Sincronizando con el servidor…');
+  if (!silencioso) setNube('sync', 'Sincronizando con el servidor…');
   try {
     const pendientes = state.muestras.filter((m) => m.pendiente_sync);
     if (pendientes.length) await pushMuestras(pendientes.map(({ pendiente_sync, ...m }) => m));
@@ -33,7 +49,12 @@ export async function syncNube() {
     await store.putMuestras(pendientes.map(({ pendiente_sync, ...m }) => m));
     await store.putMuestras(remotas.filter((r) => !locales.get(r.codigo)?.pendiente_sync || pendientes.some((p) => p.codigo === r.codigo)));
     await refresh();
-    setNube('ok', `Sincronizado: ${remotas.length} muestras en el servidor.`);
+    try {
+      state.mape = await pullMape();
+      writePref('ahg.mape.cache', state.mape);
+      emit('mape');
+    } catch { /* el registro MAPE es opcional */ }
+    setNube('ok', `Sincronizado ${new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}: ${remotas.length} muestras y ${state.mape.length} unidades mineras en el servidor.`);
   } catch (e) {
     setNube('error', `Sin conexión con el servidor: ${e.message}. Los cambios quedan guardados aquí.`);
   }
@@ -64,6 +85,6 @@ export async function importMuestras(list) {
   return nuevas.length;
 }
 
-export async function resetDemo() { await store.clearMuestras(); await store.putMuestras(demoMuestras()); await refresh(); }
+export async function resetDemo() { await store.clearMuestras(); await store.putMuestras(demoMuestras()); state.mape = demoMape(); emit('mape'); await refresh(); }
 export async function clearLocal() { await store.clearMuestras(); await refresh(); }
 export const byCodigo = (codigo) => state.muestras.find((m) => m.codigo === codigo) || null;

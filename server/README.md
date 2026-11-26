@@ -15,16 +15,48 @@ datos van a Ahgora Web (autoridades) y, solo lo aprobado y en zonas agregadas, a
 > Ninguna de las tres cuentas pide tarjeta, así que no hay cargos automáticos. **No** pases a Atlas Flex o M10 ni a
 > Vercel Pro (esos sí son de pago).
 
+## Base de datos «ahgora» (v2, 25 nov 2026)
+
+La API usa la base **`ahgora`** (antes `hgguard`, con estaciones y corridas de Hg-Guard, que queda intacta y sin uso).
+Al primer arranque crea las colecciones con un **validador `$jsonSchema`** e índices (`lib/esquema.js`): MongoDB
+rechaza documentos sin los campos mínimos. Estructura según la guía vigente (*Descripción de la solución* 7.6 y
+*Guía definitiva y Android Comunidad*, secciones 08 y 09):
+
+| Colección | Qué guarda | Lo escribe |
+|---|---|---|
+| `muestras` | Registro técnico protegido: código, matriz, cabezal, fecha, coordenadas, lecturas crudas del ESP32 (RGBC del TCS34725 o voltamograma), cálculo C_sed/C_pez, semáforo, controles, calibración, certeza, laboratorio, alerta, visibilidad | App modo técnico, Ahgora Web, simulador |
+| `avisos` | Versión pública del aviso (guía 09): `id`, `zona_id`, `version`, `estado` (confirmacion_pendiente · en_analisis · resultado_confirmado · retirado), `titulo`, `resumen`, `accion`, `entidad`, `publicado_en`, `actualizado_en`, `retirado` | Solo el servidor, en `/api/sync` |
+| `bitacora` | Cada publicación, actualización o retiro, con responsable y fecha (guía 08) | Solo el servidor |
+| `zonas` | Zonas públicas (celdas de 0,1°) con su contacto oficial | `/api/admin` (inicializar) |
+| `reportes` | Reportes comunitarios voluntarios (en revisión, nunca se publican) | Ahgora Comunidad |
+| `mape` | Unidades mineras y su **estado legal**: `al_dia` · `en_tramite` · `ilegal`, con `base_estado` (registro_ajam, tramite_ajam, inspeccion_ajam, denuncia, presuncion_satelital, demostracion) y su huella satelital | Ahgora Web |
+| `sitios` | Sitio piloto Alcoche (Caranavi): ubicación, eje Coroico → Kaka, comunidades | `/api/admin` |
+| `referencias` | Antecedentes publicados de la zona (estudios, AJAM, Concejo, prensa) | `/api/admin` |
+
 ## Endpoints
 
 | Ruta | Método | Clave | Qué hace |
 |---|---|---|---|
-| `/` y `/api/health` | GET | No | Estado de la API y ping a MongoDB |
-| `/api/sync` | POST | `x-ahg-key` | `{ "muestras": [registro] }`: inserta o actualiza por `codigo`. Repetir no duplica. Calcula la versión pública del aviso (ver abajo) |
-| `/api/datos?coleccion=muestras[&codigo=]` | GET | `x-ahg-key` | Lista o detalle, con ubicación exacta (solo equipo y autoridades) |
-| `/api/alertas` | GET | No | Para Ahgora Comunidad: solo mensajes **aprobados** de muestras **públicas**, con zona agregada (celda de 0,1°), sin coordenadas exactas, código de muestra ni responsables. Cada aviso trae `id` y `version`; los retirados en los últimos 90 días llegan con `retirado: true` |
-| `/api/reportes` | POST | No | Reporte comunitario voluntario de Ahgora Comunidad. Queda `en_revision`; nunca se publica como aviso. Máx. 20 por hora por origen |
-| `/api/reportes[?limit=]` | GET | `x-ahg-key` | Lista los reportes recibidos (más recientes primero) |
+| `/` y `/api/health` | GET | No | Estado, versión y base en uso |
+| `/api/sync` | POST | `x-ahg-key` | `{ "muestras": [...], "mape": [...] }`: inserta o actualiza por `codigo` / `id`. Rechaza (y lista en `rechazadas`) lo que no tiene código, matriz válida o fecha. Si cambia lo que ve la comunidad, actualiza `avisos` y la `bitacora` |
+| `/api/datos?coleccion=…` | GET | `x-ahg-key` | `muestras`, `mape`, `avisos`, `bitacora`, `zonas`, `reportes`, `sitios`, `referencias`. `&codigo=` o `&id=` para uno; `&desde=ISO` para lo cambiado después |
+| `/api/admin` | GET | `x-ahg-key` | Colecciones, documentos, simulados y validadores |
+| `/api/admin` | POST | `x-ahg-key` | `{ accion: "inicializar", sitio, referencias, zonas }` (idempotente) · `{ accion: "borrar_demostracion" }` (solo lo marcado `demostracion: true`) |
+| `/api/public/zonas` | GET | No | Zonas con contacto y avisos vigentes (guía 09) |
+| `/api/public/avisos` | GET | No | Avisos vigentes; `?zona_id=`, `?desde=<cursor>` (incluye retiros), `?id=` (detalle). Devuelve `{ items, cursor }` |
+| `/api/alertas` | GET | No | Formato anterior para Ahgora Comunidad (se mantiene por compatibilidad) |
+| `/api/reportes` | POST / GET | No / `x-ahg-key` | Reportes comunitarios (máx. 20 por hora por origen) |
+
+### Cargar datos y simular el lector
+
+- **Ahgora Web → Configuración → Base de datos del servidor → «Preparar base y cargar simulación»**: crea las
+  colecciones, carga el sitio Alcoche, sus antecedentes y zonas, y envía 25 muestras y 13 unidades mineras simuladas.
+- **Simulador del ESP32** (desde `server/`): `node scripts/simular-esp32.mjs --key <clave> --n 6 --cada 20` envía una
+  muestra cada 20 s con lecturas crudas, cálculo y semáforo, como la app modo técnico. `--seco` las imprime sin enviar.
+- «Borrar simulación» deja la base solo con datos reales.
+
+Probado de punta a punta con MongoDB real (mongodb-memory-server) el 25 nov 2026: validadores activos, 25 muestras,
+5 avisos públicos, retiro con versión 2 visible en `?desde=`, sin duplicados al repetir, 401 sin clave.
 
 ### Avisos para Ahgora Comunidad: id, versión y retiro
 
@@ -62,7 +94,7 @@ No se guarda la IP: solo una huella (hash con la clave del equipo) para el lími
 
 Pruebas sin base de datos: `npm test` (desde `server/`).
 
-Colección: `muestras` (el registro está documentado en [web/README.md](../web/README.md#registro-de-muestra-contrato-con-la-app-modo-técnico-y-el-firmware)).
+Registro de muestra (el registro está documentado en [web/README.md](../web/README.md#registro-de-muestra-contrato-con-la-app-modo-técnico-y-el-firmware)).
 La cabecera antigua `x-hg-key` y la variable `HG_TEAM_KEY` siguen aceptándose para no romper el despliegue existente.
 
 ## Puesta en marcha (unos 10 minutos)

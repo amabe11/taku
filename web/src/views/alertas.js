@@ -47,7 +47,7 @@ async function revisar(m, tipo) {
 export function alertasView() {
   const host = h('div', { class: 'stack' });
   function card(m) {
-    const tipo = m.alerta?.estado === 'aprobada' ? m.alerta.tipo : alertaSugerida(m);
+    const tipo = (m.alerta?.estado === 'aprobada' && ALERTAS[m.alerta.tipo] ? m.alerta.tipo : alertaSugerida(m)) || 'aviso_cribado';
     const texto = m.alerta?.estado === 'aprobada' ? m.alerta.mensaje : ALERTAS[tipo].texto;
     return h('li', { class: 'card alert-card' },
       h('div', null,

@@ -1,7 +1,7 @@
 {
   "name": "ahgora-api",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "description": "Servidor Ahgora: Vercel Functions (plan Hobby gratuito) + MongoDB Atlas M0 (gratuito)",
   "engines": {
@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "node dev.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "simular": "node scripts/simular-esp32.mjs"
   },
   "dependencies": {
     "mongodb": "^7.0.0"

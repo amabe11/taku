@@ -11,7 +11,10 @@
 
 **Producto:** Ahgora Web · sitio para autoridades ambientales y de salud, laboratorios e investigadores
 **Categoría:** mapa de decisión + panel de datos de campo y laboratorio
-**Dirección visual:** A — «Cartografía nocturna» (`direcciones.md`)
+**Dirección visual (v2, 25 nov 2026):** «Papel y tinta». Tema claro por defecto (papel #f4f3ef, tinta #1c2024),
+tema oscuro grafito neutro, un solo acento bronce discreto para enlaces y foco. Sin violeta ni azul de marca: el
+color queda para lo que significa algo (semáforo de muestras, estado legal MAPE, agua). Reemplaza a la dirección A
+«Cartografía nocturna» (violeta sobre índigo), que se veía saturada. Tokens en `web/src/styles/tokens.css`.
 **Diales:** variación 5/10 · movimiento 3/10 · densidad 8/10
 
 ---

@@ -11,8 +11,11 @@ Guía del proyecto: **[Ahgora_Descripcion_de_la_Solucion_Estilizada.pdf](Ahgora_
   (voltametría de redisolución sobre oro). Envía el registro por Bluetooth a la app.
 - **App Android:** modo técnico (captura sin internet) y Ahgora Comunidad (alertas revisadas).
 - **Servidor Ahgora:** API en Vercel + MongoDB Atlas (`server/`).
-- **Ahgora Web:** sitio para autoridades y laboratorios (`web/`): mapa, priorización, cuenca, indicadores, alertas y
-  capas NASA.
+- **Ahgora Web:** sitio para autoridades y laboratorios (`web/`): dos mapas (muestras por semáforo y minería MAPE por
+  estado legal), priorización, cuenca, indicadores, avisos y datos abiertos (Amazon Mining Watch, Sentinel-2, NASA,
+  GloFAS, SoilGrids, GBIF).
+
+**Sitio piloto: Alcoche** (municipio de Caranavi, La Paz), sobre el río Coroico.
 
 > Es **cribado**, no evidencia legal ni diagnóstico. «Cribado» y «confirmado por laboratorio» nunca se mezclan.
 
@@ -30,7 +33,7 @@ Guía del proyecto: **[Ahgora_Descripcion_de_la_Solucion_Estilizada.pdf](Ahgora_
 ## Web publicada
 
 **https://amabe11.github.io/taku/**: arranca en modo demostración. Se publica con `npm run deploy:pages` desde `web/`.
-API: **https://taku-server.vercel.app** (`/api/health`, `/api/alertas` público).
+API: **https://taku-server.vercel.app** (`/api/health`; públicos: `/api/public/zonas`, `/api/public/avisos`). Base MongoDB: `ahgora`.
 
 ## Arranque rápido
 

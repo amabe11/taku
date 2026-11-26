@@ -56,6 +56,14 @@ export const UMBRALES_REFERENCIA = {
   pescado: { valor: 0.5, fuente: 'Codex CXS 193: 0,5 mg/kg peces no depredadores (1,0 depredadores)' },
 };
 
+/** Referencia aplicable a una muestra: en pescado depende del gremio trófico (Codex: 1,0 depredadores, 0,5 el resto). */
+export function umbralDe(m, umbrales = UMBRALES_REFERENCIA) {
+  if (m?.matriz === 'pescado' && m.muestreo?.gremio === 'depredador' && umbrales === UMBRALES_REFERENCIA) {
+    return { valor: 1.0, fuente: 'Codex CXS 193: 1,0 mg/kg en peces depredadores' };
+  }
+  return umbrales[m?.matriz];
+}
+
 // ------------------------------------------------------------------ cálculos (4.6 y 5.3)
 /** C_sed (mg/kg seco) = C_ext × V_ext / (m_húmeda × f_seco × R). Devuelve null si falta algún término. */
 export function cSed({ c_ext_mg_l, v_ext_l, m_humeda_kg, f_seco, recuperacion_r } = {}) {
@@ -142,7 +150,7 @@ export function colaPriorizacion(muestras, cuenca) {
     if (m.certeza === 'en_verificacion') { enVerificacion.push(m); continue; }
     const ctx = contextoCuenca(m, cuenca);
     const est = estimado(m);
-    const ref = UMBRALES_REFERENCIA[m.matriz]?.valor;
+    const ref = umbralDe(m)?.valor;
     enCola.push({ m, ctx, poblacion: ctx?.poblacion ?? 0, ratio: est != null && ref ? est / ref : null });
   }
   enCola.sort((a, b) =>
@@ -174,7 +182,7 @@ export function indicadores(muestras, umbrales = UMBRALES_REFERENCIA) {
   for (const m of conf) {
     const lab = Number(m.laboratorio.resultado_mg_kg);
     const pos = m.semaforo === 'rojo' || m.semaforo === 'amarillo';
-    const real = lab >= (umbrales[m.matriz]?.valor ?? Infinity);
+    const real = lab >= (umbralDe(m, umbrales)?.valor ?? Infinity);
     if (real && pos) vp++; else if (real) fn++; else if (pos) fp++; else vn++;
     const e = estimado(m); if (e != null && e > 0 && lab > 0) pares.push([Math.log10(e), Math.log10(lab)]);
   }
@@ -221,9 +229,11 @@ export const ALERTAS = {
 /** Qué tipo de mensaje corresponde a la muestra según su certeza y resultado. null = nada que publicar. */
 export function alertaSugerida(m, umbrales = UMBRALES_REFERENCIA) {
   if (m.certeza === 'confirmado' && m.laboratorio?.resultado_mg_kg != null) {
-    return Number(m.laboratorio.resultado_mg_kg) >= (umbrales[m.matriz]?.valor ?? Infinity) ? 'alerta_confirmada' : 'tranquilizador';
+    return Number(m.laboratorio.resultado_mg_kg) >= (umbralDe(m, umbrales)?.valor ?? Infinity) ? 'alerta_confirmada' : 'tranquilizador';
   }
   if (m.semaforo === 'rojo') return 'aviso_cribado';
+  // Guía definitiva, sección 05: una muestra enviada al laboratorio puede avisarse como «En análisis».
+  if (m.certeza === 'en_verificacion' && m.semaforo !== 'invalido') return 'aviso_cribado';
   return null;
 }
 
@@ -232,3 +242,32 @@ export function zonaPublica(lat, lon, paso = 0.1) {
   const f = (v) => Math.floor(v / paso) * paso;
   return { lat_min: +f(lat).toFixed(2), lon_min: +f(lon).toFixed(2), lat_max: +(f(lat) + paso).toFixed(2), lon_max: +(f(lon) + paso).toFixed(2) };
 }
+
+// ------------------------------------------------------------------ MAPE: estado legal de las unidades mineras
+// Otro semáforo, distinto del de las muestras: verde = papeles al día, amarillo = en trámite, rojo = ilegal o
+// presunta ilegal. Siempre con su base (de dónde sale el estado). La legalidad la determina la AJAM.
+export const LEGAL = {
+  al_dia: { label: 'Papeles al día', corto: 'Al día', icon: 'doc_check', tone: 'ok',
+    significa: 'Derecho minero (contrato administrativo minero o licencia) y licencia ambiental vigentes.' },
+  en_tramite: { label: 'Papeles en trámite', corto: 'En trámite', icon: 'hourglass', tone: 'warn',
+    significa: 'Solicitud de derecho minero o adecuación en curso ante la AJAM.' },
+  ilegal: { label: 'Ilegal o presunta ilegal', corto: 'Ilegal', icon: 'cross', tone: 'fail',
+    significa: 'Sin derecho minero: lo constató una inspección, lo dice una denuncia o es una huella fuera del registro (presunción).' },
+  sin_verificar: { label: 'Huella sin verificar', corto: 'Sin verificar', icon: 'question', tone: 'neutral',
+    significa: 'Detectada por satélite; todavía no está en el registro cargado. No se presume nada.' },
+};
+export const BASE_LEGAL = {
+  registro_ajam: 'Registro de la AJAM (catastro minero)',
+  tramite_ajam: 'Trámite en la AJAM',
+  inspeccion_ajam: 'Inspección de la AJAM',
+  denuncia: 'Denuncia pública (sin verificación independiente)',
+  presuncion_satelital: 'Presunción: huella satelital fuera del registro',
+  demostracion: 'Estado de demostración (ficticio)',
+};
+/** Rótulo del estado legal con su grado de certeza: «ilegal» solo si lo constató la autoridad. */
+export function legalRotulo(u) {
+  if (!u) return LEGAL.sin_verificar.label;
+  if (u.estado_legal !== 'ilegal') return LEGAL[u.estado_legal]?.label || LEGAL.sin_verificar.label;
+  return { inspeccion_ajam: 'Ilegal · constatado por la AJAM', registro_ajam: 'Ilegal · registro de la AJAM', denuncia: 'Presunta ilegal · denuncia', presuncion_satelital: 'Presunta ilegal · huella sin registro' }[u.base_estado] || 'Presunta ilegal';
+}
+export const distanciaKm = (lon1, lat1, lon2, lat2) => Math.hypot((lon1 - lon2) * 111.32 * Math.cos((lat1 * Math.PI) / 180), (lat1 - lat2) * 110.57);

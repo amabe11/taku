@@ -6,7 +6,9 @@ import { state, on } from '../state.js';
 import { persistGranted, requestPersist } from '../store.js';
 import { switchMode } from '../components/shell.js';
 import { downloadText, parseCsv, stamp } from '../csv.js';
-import { cloudCfg, saveCloudCfg, testCloud } from '../cloud.js';
+import { cloudCfg, saveCloudCfg, testCloud, cloudReady, estadoBase, inicializarBase, borrarDemoServidor, pushMuestras, pushMape } from '../cloud.js';
+import { demoMuestras, demoMape, DEMO_CUENCA } from '../data/demo.js';
+import { SITIO, REFERENCIAS, ZONAS } from '../data/alcoche.js';
 import { syncNube, importMuestras, resetDemo, clearLocal } from '../data.js';
 import { viewHeader, dl, formDialog } from './common.js';
 
@@ -21,7 +23,7 @@ export function configuracionView() {
       h('label', { class: 'check' }, h('input', { type: 'radio', name: 'modo', value: 'nube', checked: state.mode === 'nube' || null }),
         h('span', null, 'Servidor Ahgora', h('small', null, 'Muestras que la app modo técnico sincronizó (MongoDB, vía la API del equipo). Los cambios de esta web se envían al servidor.'))),
       h('label', { class: 'check' }, h('input', { type: 'radio', name: 'modo', value: 'demo', checked: state.mode === 'demo' || null }),
-        h('span', null, 'Demostración', h('small', null, 'Muestras, comunidades y resultados ficticios para ensayar. Todo queda marcado como demostración y no se envía al servidor.')))),
+        h('span', null, 'Simulación', h('small', null, 'Sitio real (Alcoche) con muestras, resultados de laboratorio y estados legales simulados. Todo queda marcado como demostración y no se envía al servidor salvo que lo pidas abajo.')))),
     h('div', { class: 'view-actions' }, h('button', { class: 'btn btn-primary', type: 'submit' }, 'Aplicar')));
 
   // ---------------- servidor
@@ -45,6 +47,55 @@ export function configuracionView() {
       h('button', { class: 'btn btn-primary', type: 'button', disabled: state.mode !== 'nube', onclick: async () => { saveCfg(); await syncNube(); say(state.nube.mensaje); } }, 'Sincronizar ahora')),
     state.mode !== 'nube' ? h('p', { class: 'meta', style: { margin: 0 } }, 'Para sincronizar, cambia el origen a «Servidor Ahgora».') : null,
     cloudStatus);
+
+  // ---------------- base de datos del servidor (MongoDB «ahgora»)
+  const dbStatus = h('p', { class: 'meta', role: 'status', style: { margin: 0 } });
+  const dbTable = h('div', { class: 'table-wrap' });
+  const dbSay = (t) => { dbStatus.textContent = t; announce(t); };
+  const NOMBRES = { muestras: 'Muestras (registro técnico)', avisos: 'Avisos públicos (Ahgora Comunidad)', bitacora: 'Bitácora de publicación', zonas: 'Zonas públicas (0,1°)', reportes: 'Reportes comunitarios', mape: 'Unidades mineras (MAPE)', sitios: 'Sitio piloto', referencias: 'Antecedentes' };
+  function showEstado(r) {
+    mount(dbTable, h('table', { class: 'data-table compact db-table' },
+      h('caption', { class: 'sr-only' }, `Colecciones de la base ${r.base}`),
+      h('thead', null, h('tr', null, ['Colección', 'Validador', 'Documentos', 'Simulados'].map((t) => h('th', { scope: 'col' }, t)))),
+      h('tbody', null, Object.entries(r.colecciones).map(([k, c]) => h('tr', null,
+        h('th', { scope: 'row' }, NOMBRES[k] || k, h('div', { class: 'meta mono' }, k)),
+        h('td', null, c.validador ? h('span', { class: 'db-ok' }, 'Sí') : h('span', { class: 'db-no' }, c.existe ? 'No' : 'Falta')),
+        h('td', { class: 'num mono' }, fmtN(c.documentos)),
+        h('td', { class: 'num mono' }, c.demostracion == null ? '—' : fmtN(c.demostracion)))))));
+  }
+  const fmtN = (n) => new Intl.NumberFormat('es-BO').format(n ?? 0);
+  const conClave = async (fn) => {
+    saveCfg();
+    if (!cloudReady()) { dbSay('Escribe la clave del equipo arriba (Servidor Ahgora) y vuelve a intentar.'); return; }
+    try { await fn(); } catch (e) { dbSay(`No se pudo: ${e.message}`); }
+  };
+  const dbCard = h('section', { class: 'card', 'aria-labelledby': 'cfg-db' },
+    h('h2', { class: 'card-title', id: 'cfg-db' }, 'Base de datos del servidor'),
+    h('p', { class: 'meta' }, 'Base «ahgora» en MongoDB Atlas, con la estructura de la guía vigente: muestras, avisos públicos con versión y retiro, bitácora, zonas, reportes, unidades mineras, sitio y antecedentes. Cada colección valida sus documentos.'),
+    dbTable,
+    h('div', { class: 'view-actions' },
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => conClave(async () => { dbSay('Consultando…'); const r = await estadoBase(); showEstado(r); dbSay(`Base «${r.base}» conectada.`); }) }, icon('database'), 'Ver estado'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => conClave(async () => {
+        dbSay('Preparando colecciones y cargando el sitio Alcoche…');
+        await inicializarBase({ por: 'Ahgora Web', sitio: { ...SITIO, eje: DEMO_CUENCA.eje, comunidades: DEMO_CUENCA.comunidades }, referencias: REFERENCIAS, zonas: ZONAS });
+        dbSay('Enviando la simulación (muestras del lector y registro MAPE)…');
+        const nm = await pushMuestras(demoMuestras());
+        const nu = await pushMape(demoMape());
+        const r = await estadoBase(); showEstado(r);
+        dbSay(`Listo: ${nm} muestras y ${nu} unidades mineras simuladas en «${r.base}». Los avisos aprobados ya están en /api/public/avisos.`);
+        if (state.mode === 'nube') syncNube();
+      }) }, icon('upload'), 'Preparar base y cargar simulación'),
+      h('button', { class: 'btn btn-danger', type: 'button', onclick: () => conClave(async () => {
+        const ok = await formDialog({ title: '¿Borrar la simulación del servidor?', intro: 'Se borran del servidor solo los registros marcados como demostración (muestras, avisos y unidades mineras simuladas). Los datos reales no se tocan.', submit: 'Borrar simulación', danger: true });
+        if (!ok) return;
+        const r = await borrarDemoServidor(); showEstado(r);
+        dbSay(`Borrados: ${r.borrados.muestras} muestras, ${r.borrados.avisos} avisos y ${r.borrados.mape} unidades simuladas.`);
+        if (state.mode === 'nube') syncNube();
+      }) }, 'Borrar simulación')),
+    dbStatus,
+    h('details', { class: 'layers-limits' }, h('summary', null, 'Simular el lector ESP32 en vivo'),
+      h('p', { class: 'meta' }, 'Desde la carpeta del proyecto, con la clave del equipo. Envía una muestra cada 20 segundos como lo haría la app modo técnico; aparecen aquí sin recargar (modo servidor).'),
+      h('pre', { class: 'formula mono' }, 'cd server\nnode scripts/simular-esp32.mjs --key <clave> --n 6 --cada 20')));
 
   // ---------------- importar
   const fileIn = h('input', { type: 'file', accept: '.json,.csv,application/json,text/csv', class: 'sr-only', id: 'imp-file', onchange: async (e) => {
@@ -93,15 +144,16 @@ export function configuracionView() {
     dl([
       ['Para quién', 'Autoridades ambientales y de salud, laboratorios, investigadores y cooperación'],
       ['Registro', 'código, matriz, coordenadas, fecha, responsable, lecturas crudas, valor estimado, semáforo, controles, versión de calibración, certeza, laboratorio, visibilidad (7.6)'],
-      ['API', 'GET /api/datos?coleccion=muestras · POST /api/sync · GET /api/alertas (público)'],
-      ['Mapa', 'Natural Earth 1:10m (dominio público) · relieve ETOPO1 (NOAA) · capas NASA GIBS'],
+      ['API', 'POST /api/sync · GET /api/datos · GET|POST /api/admin · GET /api/public/zonas y /api/public/avisos (públicos, guía 09) · GET /api/alertas · /api/reportes'],
+      ['Mapa', 'Natural Earth 1:10m · relieve ETOPO1 (NOAA) · OpenStreetMap (ODbL) · Amazon Mining Watch (CC BY 4.0) · Sentinel-2 cloudless (EOX) · NASA GIBS'],
+      ['Datos del sitio', 'GloFAS y ERA5 vía Open-Meteo · SoilGrids 2.0 (ISRIC) · GBIF · NASA POWER'],
       ['Tipografía', 'Atkinson Hyperlegible Next y Mono (SIL OFL)'],
       ['Límite', 'Cribado: prioriza la confirmación en laboratorio, no la reemplaza.'],
     ]));
 
   const el = h('div', { class: 'view' },
     viewHeader('Configuración', 'Opciones de esta web. Se guardan en este navegador.'),
-    h('div', { class: 'two-col' }, modeForm, cloudCard, importCard, dataCard, about));
+    h('div', { class: 'two-col' }, modeForm, cloudCard, dbCard, importCard, dataCard, about));
   const offs = [on('muestras', renderData), on('nube', () => { if (state.nube.mensaje) cloudStatus.textContent = state.nube.mensaje; })];
   renderData();
   return { el, destroy() { offs.forEach((f) => f()); } };

@@ -1,32 +1,27 @@
-// Servidor Ahgora (secciones 3 y 7.6 de la guía): Vercel Functions + MongoDB Atlas M0.
-// Reúne las muestras que sincroniza la app modo técnico y las confirmaciones/alertas que agrega Ahgora Web.
+// Servidor Ahgora: Vercel Functions + MongoDB Atlas M0. Estructura de la base en lib/esquema.js.
 // Variables de entorno (se configuran en Vercel, nunca en el repositorio):
 //   MONGODB_URI                    cadena de conexión de Atlas (mongodb+srv://…)
 //   AHG_TEAM_KEY (o HG_TEAM_KEY)   clave del equipo; se envía en la cabecera «x-ahg-key» para leer o escribir
-//   AHG_DB (o HG_DB)               nombre de la base (opcional; por defecto «hgguard», la ya creada)
+//   AHG_DB                         nombre de la base (opcional; por defecto «ahgora»). La base antigua «hgguard»
+//                                  (estaciones y corridas de Hg-Guard) queda intacta y ya no se usa.
 import { createHash } from 'node:crypto';
 import { MongoClient } from 'mongodb';
+import { inicializar } from './esquema.js';
 
-let clientPromise = globalThis.__hgMongo;
+export const BASE_POR_DEFECTO = 'ahgora';
+let clientPromise = globalThis.__ahgMongo;
 export async function db() {
   if (!process.env.MONGODB_URI) throw Object.assign(new Error('Falta MONGODB_URI en las variables de entorno'), { status: 500 });
   if (!clientPromise) {
     // Conexión reutilizada entre invocaciones (evita agotar las 500 conexiones del plan gratuito).
-    clientPromise = globalThis.__hgMongo = new MongoClient(process.env.MONGODB_URI, { maxPoolSize: 5, serverSelectionTimeoutMS: 8000 }).connect();
+    clientPromise = globalThis.__ahgMongo = new MongoClient(process.env.MONGODB_URI, { maxPoolSize: 5, serverSelectionTimeoutMS: 8000 }).connect()
+      .catch((e) => { globalThis.__ahgMongo = clientPromise = null; throw e; });
   }
   const client = await clientPromise;
-  const d = client.db(process.env.AHG_DB || process.env.HG_DB || 'hgguard');
-  if (!globalThis.__hgIndexes) {
-    globalThis.__hgIndexes = Promise.all([
-      d.collection('muestras').createIndex({ codigo: 1 }, { unique: true }),
-      d.collection('muestras').createIndex({ fecha_iso: -1 }),
-      d.collection('muestras').createIndex({ 'alerta.estado': 1 }),
-      d.collection('muestras').createIndex({ 'publicacion.retirado_en': -1 }, { sparse: true }),
-      d.collection('reportes').createIndex({ recibido_en: -1 }),
-      d.collection('reportes').createIndex({ origen_hash: 1, recibido_en: -1 }),
-    ]);
-  }
-  await globalThis.__hgIndexes;
+  const d = client.db(process.env.AHG_DB || BASE_POR_DEFECTO);
+  // Colecciones con validador e índices antes de la primera escritura (una vez por arranque en frío).
+  if (!globalThis.__ahgInit) globalThis.__ahgInit = inicializar(d).catch((e) => { globalThis.__ahgInit = null; throw e; });
+  await globalThis.__ahgInit;
   return d;
 }
 
@@ -65,15 +60,49 @@ export const keyOf = () => process.env.AHG_TEAM_KEY || process.env.HG_TEAM_KEY;
 // Lo que llega del navegador o de la app se limpia antes de guardarse.
 const SEM = new Set(['rojo', 'amarillo', 'verde', 'invalido']);
 const CERT = new Set(['cribado', 'en_verificacion', 'confirmado']);
+const MATRIZ_CABEZAL = { sedimento: 'SED', cola: 'SED', pescado: 'PEZ' };
+const numero = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+
+/** Muestra lista para guardar, o { error } si le falta lo indispensable (codigo, matriz, fecha). */
 export function cleanMuestra(m) {
+  if (!m || typeof m !== 'object' || !m.codigo) return { error: 'falta codigo' };
+  if (!MATRIZ_CABEZAL[m.matriz]) return { error: `${m.codigo}: matriz debe ser sedimento, cola o pescado` };
+  if (Number.isNaN(new Date(m.fecha_iso).getTime())) return { error: `${m.codigo}: fecha_iso inválida` };
   // Los campos de publicación (id público, versión, retiro) los calcula solo el servidor.
-  const { _id, pendiente_sync, sincronizado_en, sincronizado_desde, publicacion, ...rest } = m;
+  const { _id, pendiente_sync, sincronizado_en, sincronizado_desde, publicacion, creada, ...rest } = m;
   return {
     ...rest,
     codigo: String(m.codigo).slice(0, 80),
+    cabezal: MATRIZ_CABEZAL[m.matriz],
+    fecha_iso: String(m.fecha_iso),
+    lat: numero(m.lat), lon: numero(m.lon),
     semaforo: SEM.has(m.semaforo) ? m.semaforo : 'invalido',
     certeza: CERT.has(m.certeza) ? m.certeza : 'cribado',
     visibilidad: m.visibilidad === 'publico' ? 'publico' : 'restringido',
+    demostracion: !!m.demostracion,
+  };
+}
+
+// Unidades mineras (MAPE). El estado legal se acompaña siempre de su base: registro o trámite en la AJAM,
+// inspección, denuncia, o presunción por huella satelital fuera de un derecho minero registrado.
+const ESTADO_LEGAL = new Set(['al_dia', 'en_tramite', 'ilegal']);
+const BASE_ESTADO = new Set(['registro_ajam', 'tramite_ajam', 'inspeccion_ajam', 'denuncia', 'presuncion_satelital', 'demostracion']);
+const TIPO_MAPE = new Set(['cooperativa', 'empresa', 'unipersonal', 'sin_identificar']);
+const MERCURIO = new Set(['declarado', 'presunto', 'sin_mercurio', 'desconocido']);
+export function cleanMape(u) {
+  if (!u || typeof u !== 'object' || !u.id || !u.nombre) return { error: 'falta id o nombre' };
+  const lat = numero(u.lat), lon = numero(u.lon);
+  if (lat == null || lon == null) return { error: `${u.id}: falta ubicación` };
+  if (!ESTADO_LEGAL.has(u.estado_legal)) return { error: `${u.id}: estado_legal debe ser al_dia, en_tramite o ilegal` };
+  const { _id, ...rest } = u;
+  return {
+    ...rest,
+    id: String(u.id).slice(0, 80), nombre: String(u.nombre).slice(0, 160), lat, lon,
+    tipo: TIPO_MAPE.has(u.tipo) ? u.tipo : 'sin_identificar',
+    base_estado: BASE_ESTADO.has(u.base_estado) ? u.base_estado : 'demostracion',
+    mercurio: MERCURIO.has(u.mercurio) ? u.mercurio : 'desconocido',
+    area_ha: numero(u.area_ha),
+    demostracion: !!u.demostracion,
   };
 }
 
@@ -101,6 +130,38 @@ export function vistaPublica(m) {
     matriz: m.matriz, zona: zonaPublica(Number(m.lat), Number(m.lon)), certeza, nivel: NIVEL[certeza],
     tipo: m.alerta.tipo, mensaje: m.alerta.mensaje, fecha: m.alerta.fecha,
     laboratorio: certeza === 'confirmado' ? m.laboratorio?.laboratorio || undefined : undefined,
+    demostracion: !!m.demostracion,
+  };
+}
+
+/** Id de la zona pública (celda de 0,1°). */
+export const zonaId = (z) => `z-${Number(z.lat_min).toFixed(1)}_${Number(z.lon_min).toFixed(1)}`;
+
+// Estados públicos y textos de interfaz propuestos por la guía (sección 05, «Mensajes y acciones»).
+const ESTADO_PUBLICO = { cribado: 'confirmacion_pendiente', en_verificacion: 'en_analisis', confirmado: 'resultado_confirmado' };
+const MATRIZ_TXT = { sedimento: 'sedimento', cola: 'cola minera', pescado: 'pescado' };
+export const TEXTOS_AVISO = {
+  confirmacion_pendiente: { titulo: 'Confirmación pendiente', resumen: (m) => `Una muestra de ${m} de tu zona necesita análisis de laboratorio. Publicaremos una actualización cuando se revise el resultado.`, accion: 'Ver el detalle o consultar el contacto oficial.' },
+  en_analisis: { titulo: 'En análisis', resumen: () => 'La muestra fue enviada al laboratorio. El resultado todavía está pendiente.', accion: 'Consultar fecha y canal de seguimiento.' },
+  resultado_confirmado: { titulo: 'Resultado confirmado', resumen: (m) => `El laboratorio emitió un resultado para una muestra de ${m}. Consulta el aviso revisado y su fecha.`, accion: 'Leer el resultado comunicado y las indicaciones aprobadas, si las hay.' },
+  retirado: { titulo: 'Actualizado o retirado', resumen: () => 'Este aviso cambió. Consulta la fecha y el motivo de la actualización.', accion: 'Abrir la versión vigente si está disponible.' },
+};
+
+/** Documento de la colección `avisos` (contrato de la guía, sección 09) a partir de la muestra y su publicación. */
+export function avisoDe(m, pub, anterior) {
+  const estado = pub.retirado_en ? 'retirado' : ESTADO_PUBLICO[m.certeza] || 'confirmacion_pendiente';
+  const t = TEXTOS_AVISO[estado];
+  const matriz = MATRIZ_TXT[m.matriz] || 'sedimento';
+  return {
+    id: pub.id, zona_id: zonaId(pub.zona), zona: pub.zona, version: pub.version, estado,
+    titulo: t.titulo, resumen: t.resumen(matriz), accion: t.accion,
+    mensaje_aprobado: pub.retirado_en ? '' : String(m.alerta?.mensaje || ''),
+    entidad: String(m.alerta?.entidad || m.alerta?.aprobada_por || 'Equipo Ahgora'),
+    matriz: m.matriz,
+    ...(estado === 'resultado_confirmado' && m.laboratorio?.laboratorio ? { referencia_informe: `${m.laboratorio.laboratorio}${m.laboratorio.fecha_resultado ? ` · ${String(m.laboratorio.fecha_resultado).slice(0, 10)}` : ''}` } : {}),
+    publicado_en: anterior?.publicado_en || pub.actualizado_en,
+    actualizado_en: pub.actualizado_en,
+    retirado: !!pub.retirado_en,
     demostracion: !!m.demostracion,
   };
 }

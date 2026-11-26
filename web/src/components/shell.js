@@ -4,23 +4,30 @@ import { icon } from '../lib/icons.js';
 import { state, on, writePref } from '../state.js';
 
 export const NAV = [
-  { caption: 'Decidir', items: [
-    ['mapa', 'Mapa de muestras', 'map'],
+  { caption: 'Territorio', items: [
+    ['mapa', 'Mapas: muestras y MAPE', 'map'],
+    ['sitio', 'Sitio Alcoche', 'pin'],
+    ['mape', 'Minería (MAPE)', 'pick'],
+  ] },
+  { caption: 'Muestras', items: [
     ['muestras', 'Muestras', 'table'],
-    ['priorizacion', 'Cola de priorización', 'queue'],
+    ['priorizacion', 'Cola de laboratorio', 'queue'],
     ['cuenca', 'Vista de cuenca', 'river'],
     ['indicadores', 'Indicadores', 'gauge'],
-    ['alertas', 'Alertas comunitarias', 'bell'],
+  ] },
+  { caption: 'Comunidad', items: [
+    ['alertas', 'Avisos comunitarios', 'bell'],
+    ['reportes', 'Reportes comunitarios', 'flag'],
   ] },
   { caption: 'Transparencia', items: [
     ['metodo', 'Método y límites', 'book'],
+    ['configuracion', 'Configuración y servidor', 'settings'],
   ] },
-  { caption: null, items: [['configuracion', 'Configuración', 'settings']] },
 ];
 
 const brand = () => h('div', { class: 'brand' },
   h('span', { class: 'logo-mark', 'aria-hidden': 'true' }, 'A', h('b', null, 'Hg')),
-  h('div', { class: 'brand-text' }, h('div', { class: 'brand-title' }, 'Ahgora Web'), h('div', { class: 'brand-sub' }, 'Cribado de mercurio · ORO-4.1')));
+  h('div', { class: 'brand-text' }, h('div', { class: 'brand-title' }, 'Ahgora Web'), h('div', { class: 'brand-sub' }, 'Cribado de mercurio · Alcoche')));
 
 function navList(onNavigate) {
   const frag = [];
@@ -110,9 +117,9 @@ export function createShell() {
       banner.hidden = false;
       banner.className = 'demo-banner';
       mount(banner, icon('beaker_demo', { cls: 'shrink-0 w-5 h-5 text-hg-warn' }),
-        h('span', null, h('strong', null, 'Demostración'),
-          h('span', { class: 'banner-long' }, ' — muestras, comunidades y resultados de laboratorio ficticios. No son mediciones reales.'),
-          h('span', { class: 'banner-short' }, ': datos ficticios, no mediciones reales.')),
+        h('span', null, h('strong', null, 'Simulación'),
+          h('span', { class: 'banner-long' }, ' — el lugar, los ríos y las huellas mineras son reales; las muestras, los resultados de laboratorio y el estado legal de las cooperativas son simulados.'),
+          h('span', { class: 'banner-short' }, ': sitio real, muestras simuladas.')),
         h('button', { class: 'link-btn', type: 'button', onclick: () => switchMode('nube') }, 'Usar el servidor'));
     } else if (n.status === 'error' || n.status === 'sin_config') {
       banner.hidden = false;

@@ -14,19 +14,22 @@ export const state = {
   mode: 'demo',            // 'demo' | 'nube'
   persistent: true,
   muestras: [],            // registros (más reciente primero)
-  cuenca: null,            // cuenca configurada (en demostración: DEMO_CUENCA)
+  mape: [],                // unidades mineras (MAPE) con su estado legal
+  cuenca: null,            // cuenca del sitio piloto (Coroico → Kaka, Alcoche)
   nube: { status: 'idle', mensaje: '', ultima: null },
   filtros: { ...FILTROS_VACIOS },
   ui: {
-    hidden: new Set(readPref('ahg.layers.hidden', [])),
+    hidden: new Set(readPref('ahg.layers.hidden', ['intensidad'])),
     sidebar: readPref('ahg.sidebar', null),
     nasa: { capa: '', fecha: '', opacidad: 0.85, ...readPref('ahg.nasa', {}) },
+    vincular: readPref('ahg.mapas.vincular', true),
   },
 };
 
 export function setMode(mode) {
   state.mode = mode;
-  state.cuenca = mode === 'demo' ? DEMO_CUENCA : readPref('ahg.cuenca', null);
+  // El sitio piloto (Alcoche) es real: su cuenca se usa en ambos modos. Una cuenca propia guardada la reemplaza.
+  state.cuenca = readPref('ahg.cuenca', null) || DEMO_CUENCA;
 }
 
 const subs = new Map();

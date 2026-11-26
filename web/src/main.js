@@ -9,7 +9,10 @@ import { priorizacionView } from './views/priorizacion.js';
 import { cuencaView } from './views/cuenca.js';
 import { indicadoresView } from './views/indicadores.js';
 import { alertasView } from './views/alertas.js';
+import { reportesView } from './views/reportes.js';
 import { metodoView } from './views/metodo.js';
+import { mapeView } from './views/mape.js';
+import { sitioView } from './views/sitio.js';
 import { configuracionView } from './views/configuracion.js';
 
 // Popover API: los navegadores sin soporte muestran las fichas como hojas fijas (ver CSS @supports).
@@ -30,17 +33,20 @@ document.documentElement.dataset.mode = state.mode;
 // ---------------- rutas (#/vista/parámetro)
 const ROUTES = {
   mapa: mapaView,
+  sitio: sitioView,
+  mape: mapeView,
   muestras: muestrasView,
   muestra: muestraView,
   priorizacion: priorizacionView,
   cuenca: cuencaView,
   indicadores: indicadoresView,
   alertas: alertasView,
+  reportes: reportesView,
   metodo: metodoView,
   configuracion: configuracionView,
 };
 const NAV_OF = { muestra: 'muestras' };
-const TITLES = { mapa: 'Mapa de muestras' };
+const TITLES = { mapa: 'Mapas' };
 
 let current = null;
 function route(initial = false) {

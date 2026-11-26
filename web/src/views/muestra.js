@@ -1,17 +1,19 @@
 // Ficha de muestra (7.3): trazabilidad completa — quién la tomó, cuándo y dónde; controles; versión de
 // calibración; cálculo; lecturas crudas; resultado del laboratorio; contexto de cuenca y satelital.
-import { h, mount } from '../lib/dom.js';
+import { h, s, mount } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { announce } from '../lib/announce.js';
 import * as fmt from '../lib/format.js';
 import { state, on } from '../state.js';
 import { byCodigo, updateMuestra } from '../data.js';
 import {
-  MATRICES, CABEZALES, SEMAFORO, CERTEZA, CONTROLES, UMBRALES_REFERENCIA, MENSAJE_COMUNIDAD, ETIQUETA_LEGAL,
+  umbralDe, distanciaKm, MATRICES, CABEZALES, SEMAFORO, CERTEZA, CONTROLES, UMBRALES_REFERENCIA, MENSAJE_COMUNIDAD, ETIQUETA_LEGAL,
   estimado, controlesFallidos, contextoCuenca, alertaSugerida, ALERTAS,
 } from '../model.js';
 import { semaforoBadge, certezaBadge, matrizTag, demoSeal, visibilidadTag } from '../components/badges.js';
-import { NASA_LAYERS, worldviewUrl, powerPrecip } from '../geo/apis.js';
+import { NASA_LAYERS, worldviewUrl, powerPrecip, caudalEnFecha } from '../geo/apis.js';
+import { cssDe } from '../data/simulacion.js';
+import { legalBadge } from '../components/badges.js';
 import { viewHeader, emptyState, dl, formDialog } from './common.js';
 
 const field = (name, label, attrs = {}, hint) => h('div', { class: 'field' },
@@ -21,7 +23,7 @@ const field = (name, label, attrs = {}, hint) => h('div', { class: 'field' },
     : h('input', { class: `input${attrs.mono ? ' mono' : ''}`, id: `fd-${name}`, name, ...attrs, mono: undefined }),
   hint ? h('span', { class: 'hint' }, hint) : null);
 const today = () => new Date().toISOString().slice(0, 10);
-const MUESTREO = { tipo: 'Tipo de muestra', porciones: 'Porciones', profundidad_cm: 'Profundidad (cm)', fino_pct: 'Material fino (%)', observaciones: 'Observaciones', especie: 'Especie', talla_cm: 'Talla (cm)', peso_g: 'Peso (g)', porcion: 'Porción' };
+const MUESTREO = { tipo: 'Tipo de muestra', porciones: 'Porciones', profundidad_cm: 'Profundidad (cm)', fino_pct: 'Material fino (%)', observaciones: 'Observaciones', especie: 'Especie', talla_cm: 'Talla (cm)', peso_g: 'Peso (g)', porcion: 'Porción', nombre_comun: 'Nombre común', gremio: 'Gremio trófico', lugar: 'Lugar' };
 const num = (v) => Number(String(v).replace(',', '.'));
 
 export async function enviarALaboratorio(m) {
@@ -81,18 +83,68 @@ async function cambiarVisibilidad(m) {
   await updateMuestra(m.codigo, { visibilidad: next }, `Visibilidad: ${next}`, d.por.trim());
 }
 
+function voltamograma(curva, pico) {
+  const W = 360, H = 150, pad = { l: 34, r: 8, t: 10, b: 24 };
+  const xs = curva.map((p) => p[0]), ys = curva.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y1 = Math.max(...ys) * 1.1;
+  const X = (v) => pad.l + ((v - x0) / (x1 - x0)) * (W - pad.l - pad.r), Y = (v) => pad.t + (1 - v / y1) * (H - pad.t - pad.b);
+  return h('figure', { class: 'chart-fig' },
+    s('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Voltamograma: pico de mercurio de ${fmt.tc(pico.ua)} µA a ${fmt.tc(pico.v)} V.` },
+      [0, y1 / 2].map((t) => s('line', { class: 'chart-grid', x1: pad.l, x2: W - pad.r, y1: Y(t), y2: Y(t) })),
+      s('text', { class: 'chart-axis', x: pad.l - 4, y: Y(0) + 4, 'text-anchor': 'end' }, '0'),
+      s('text', { class: 'chart-axis', x: pad.l - 4, y: Y(y1 / 2) + 4, 'text-anchor': 'end' }, fmt.mv(y1 / 2)),
+      [x0, (x0 + x1) / 2, x1].map((v) => s('text', { class: 'chart-axis', x: X(v), y: H - 6, 'text-anchor': 'middle' }, `${fmt.tc(v)} V`)),
+      s('polyline', { class: 'chart-line', points: curva.map(([e, i]) => `${X(e).toFixed(1)},${Y(i).toFixed(1)}`).join(' ') }),
+      s('circle', { class: 'chart-dot', cx: X(pico.v), cy: Y(Math.max(...ys)), r: 4 }),
+      s('text', { class: 'chart-label', x: X(pico.v) + 8, y: Y(Math.max(...ys)) + 4 }, `Hg ${fmt.tc(pico.ua)} µA`)),
+    h('figcaption', { class: 'meta' }, 'Corriente (µA) frente al potencial (V) durante la redisolución. El pico cerca de +0,6 V es el mercurio depositado sobre el oro.'));
+}
+
 function rawTable(m) {
   const r = m.lecturas || {};
   if (m.cabezal === 'PEZ') {
-    return dl([['Técnica', r.tecnica], ['Deposición', r.deposicion_s != null ? `${r.deposicion_s} s` : null], ['Potencial del pico', r.potencial_pico_v != null ? `${fmt.tc(r.potencial_pico_v)} V` : null], ['Altura del pico', r.pico_ua != null ? `${fmt.tc(r.pico_ua)} µA` : null], ['Fuente', r.fuente]]);
+    return h('div', null,
+      Array.isArray(r.curva) && r.curva.length > 5 ? voltamograma(r.curva, { v: r.potencial_pico_v, ua: r.pico_ua }) : null,
+      dl([['Técnica', r.tecnica], ['Deposición', r.deposicion_s != null ? `${r.deposicion_s} s${r.potencial_deposicion_v != null ? ` a ${fmt.tc(r.potencial_deposicion_v)} V` : ''}` : null], ['Potencial del pico', r.potencial_pico_v != null ? `${fmt.tc(r.potencial_pico_v)} V` : null], ['Altura del pico', r.pico_ua != null ? `${fmt.tc(r.pico_ua)} µA` : null], ['Fuente', r.fuente]]));
   }
   const rows = [['Referencia blanca', r.referencia_blanca], ['Casilla de Hg sin usar', r.casilla_sin_usar], ['Casilla de Hg reaccionada', r.casilla_reaccionada]];
+  const blanco = r.referencia_blanca;
+  const sw = (px) => (px && blanco ? h('span', { class: 'swatch', style: { background: cssDe(px, blanco) }, 'aria-hidden': 'true' }) : null);
   return h('div', null,
+    blanco && r.casilla_sin_usar && r.casilla_reaccionada ? h('div', { class: 'swatches' },
+      h('figure', null, sw(r.casilla_sin_usar), h('figcaption', null, 'Sin usar')),
+      h('span', { class: 'swatch-arrow', 'aria-hidden': 'true' }, '→'),
+      h('figure', null, sw(r.casilla_reaccionada), h('figcaption', null, 'Reaccionada')),
+      h('p', { class: 'meta', style: { margin: 0 } }, `ΔE ${fmt.tc(r.delta_e)}: color reconstruido de los canales crudos normalizados por la referencia blanca (aproximado).`)) : null,
     h('div', { class: 'table-wrap' }, h('table', { class: 'data-table compact' },
-      h('caption', null, `Cuentas del TCS34725 (promedio de ${r.n_promedio ?? '—'} lecturas · ganancia ${r.ganancia ?? '—'} · ${r.integracion_ms ?? '—'} ms)`),
+      h('caption', null, `Cuentas del ${r.sensor || 'TCS34725'}${r.direccion_i2c ? ` (I²C ${r.direccion_i2c})` : ''} · promedio de ${r.n_promedio ?? '—'} lecturas · ganancia ${r.ganancia ?? '—'} · ${r.integracion_ms ?? '—'} ms`),
       h('thead', null, h('tr', null, h('th', { scope: 'col' }, 'Lectura'), ['R', 'G', 'B', 'C'].map((c) => h('th', { scope: 'col', class: 'num' }, c)))),
       h('tbody', null, rows.map(([k, v]) => h('tr', null, h('th', { scope: 'row' }, k), ['r', 'g', 'b', 'c'].map((c) => h('td', { class: 'num' }, v ? fmt.int(v[c]) : '—'))))))),
-    dl([['Cambio de color (ΔE)', r.delta_e != null ? fmt.tc(r.delta_e) : '—'], ['Blanco de matriz restado', r.blanco_matriz_delta != null ? `ΔE ${fmt.tc(r.blanco_matriz_delta)}` : null]]));
+    dl([['Cambio de color (ΔE)', r.delta_e != null ? fmt.tc(r.delta_e) : '—'], ['Blanco de matriz restado', r.blanco_matriz_delta != null ? `ΔE ${fmt.tc(r.blanco_matriz_delta)}` : null], ['Curva de calibración', m.calculo?.curva || m.calibracion]]));
+}
+
+function caudalCard(m) {
+  const out = h('div', { role: 'status', class: 'meta' }, 'Caudal del río en los 10 días previos al muestreo (GloFAS, Copernicus).');
+  const btn = h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {
+    btn.disabled = true; out.textContent = 'Consultando GloFAS…';
+    try {
+      const d = await caudalEnFecha(m.lon, m.lat, m.fecha_iso);
+      const dia = d.at(-1), min = Math.min(...d.map((x) => x.m3s)), max = Math.max(1, ...d.map((x) => x.m3s));
+      const crecida = dia.m3s > min * 1.8;
+      mount(out,
+        h('p', { style: { margin: 0 } }, h('b', null, `${fmt.int(dia.m3s)} m³/s`), ` el día del muestreo (mínimo de los 10 días previos: ${fmt.int(min)} m³/s).`, crecida ? h('b', null, ' Tomada en crecida.') : ''),
+        h('div', { class: 'rain-bars', role: 'img', 'aria-label': d.map((x) => `${x.fecha}: ${fmt.int(x.m3s)} m³/s`).join('; ') },
+          d.map((x) => h('span', { class: 'q', style: { blockSize: `${(x.m3s / max) * 100}%` }, title: `${x.fecha}: ${fmt.int(x.m3s)} m³/s` }))),
+        h('p', { class: 'meta', style: { margin: 0 } }, 'En crecida sube mucho el mercurio del agua y del sedimento en suspensión (Beni: de 19 a 460 ng/L). Compara muestras del mismo régimen.'));
+    } catch (e) { out.textContent = `No se pudo consultar GloFAS (${e.message}).`; btn.disabled = false; }
+  } }, icon('river'), 'Consultar caudal ese día');
+  return h('div', { class: 'evidence-block' }, out, btn);
+}
+
+function mapeCercana(m) {
+  const cerca = state.mape.map((u) => ({ u, d: distanciaKm(m.lon, m.lat, u.lon, u.lat) })).filter((x) => x.d <= 5).sort((a, b) => a.d - b.d);
+  if (!cerca.length) return h('p', { class: 'meta' }, 'Ninguna unidad minera registrada a menos de 5 km.');
+  return h('ul', { class: 'cert-list' }, cerca.slice(0, 4).map(({ u, d }) => h('li', null, legalBadge(u), h('span', null, `${u.nombre} · ${fmt.mv(d)} km`))));
 }
 
 function formula(m) {
@@ -144,7 +196,7 @@ export function muestraView(codigo) {
     }
     const sem = SEMAFORO[m.semaforo] || SEMAFORO.invalido;
     const est = estimado(m);
-    const ref = UMBRALES_REFERENCIA[m.matriz];
+    const ref = umbralDe(m);
     const fallas = controlesFallidos(m);
     const ctx = contextoCuenca(m, state.cuenca);
     const lab = m.laboratorio || {};
@@ -224,9 +276,11 @@ export function muestraView(codigo) {
                   ['Posición', `km ${fmt.int(ctx.km)} de ${fmt.int(ctx.largo)} en el eje (${fmt.mv(ctx.dist)} km del cauce)`],
                   ['Aguas arriba (posibles fuentes)', ctx.fuentes.length ? ctx.fuentes.map((f) => `${f.nombre} (${fmt.int(ctx.km - f.km)} km)`).join('; ') : 'Ninguna registrada'],
                   ['Aguas abajo (posibles expuestos)', ctx.comunidades.length ? ctx.comunidades.map((c) => `${c.nombre} (${fmt.int(c.km - ctx.km)} km)`).join('; ') : 'Ninguna registrada'],
-                  ['Población aguas abajo', ctx.comunidades.length ? `${fmt.int(ctx.poblacion)} hab.${state.mode === 'demo' ? ' (ficticio)' : ''}` : '—'],
+                  ['Población aguas abajo', ctx.comunidades.length ? `${fmt.int(ctx.poblacion)} hab. (OpenStreetMap)` : '—'],
                 ]),
-            ctx && !ctx.fuera ? h('a', { class: 'btn btn-quiet no-print', href: `#/cuenca/${encodeURIComponent(m.codigo)}` }, icon('river'), 'Abrir vista de cuenca') : null),
+            ctx && !ctx.fuera ? h('a', { class: 'btn btn-quiet no-print', href: `#/cuenca/${encodeURIComponent(m.codigo)}` }, icon('river'), 'Abrir vista de cuenca') : null,
+            m.lat != null ? [h('h3', { class: 'card-title', style: { marginTop: 'var(--sp-4)' } }, 'Minería cercana (≤ 5 km)'), mapeCercana(m)] : null,
+            m.lat != null ? [h('h3', { class: 'card-title', style: { marginTop: 'var(--sp-4)' } }, 'Caudal del río'), caudalCard(m)] : null),
           h('section', { class: 'card no-print' },
             h('h3', { class: 'card-title' }, 'Contexto satelital (NASA)'),
             h('p', { class: 'meta' }, 'Los satélites no detectan mercurio. Ayudan a interpretar: dónde crece la minería, cómo se mueven los sedimentos y quién vive aguas abajo.'),

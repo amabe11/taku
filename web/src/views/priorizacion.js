@@ -4,7 +4,7 @@ import { h, mount } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import * as fmt from '../lib/format.js';
 import { state, on } from '../state.js';
-import { MATRICES, SEMAFORO, UMBRALES_REFERENCIA, colaPriorizacion, estimado, controlesFallidos } from '../model.js';
+import { MATRICES, SEMAFORO, UMBRALES_REFERENCIA, colaPriorizacion, estimado, controlesFallidos, umbralDe } from '../model.js';
 import { semaforoBadge, certezaBadge, matrizTag, demoSeal } from '../components/badges.js';
 import { enviarALaboratorio, cargarResultado } from './muestra.js';
 import { viewHeader, emptyState, legalNote } from './common.js';
@@ -12,11 +12,11 @@ import { viewHeader, emptyState, legalNote } from './common.js';
 export function priorizacionView() {
   const host = h('div');
   function item(rank, { m, ctx, poblacion }) {
-    const est = estimado(m), ref = UMBRALES_REFERENCIA[m.matriz];
+    const est = estimado(m), ref = umbralDe(m);
     const reasons = [
       `Semáforo ${SEMAFORO[m.semaforo].label.toLowerCase()}: ${SEMAFORO[m.semaforo].accion.toLowerCase()}`,
       est != null && ref ? `Estimado ${fmt.conc(est)} mg/kg frente a la referencia de ${fmt.conc(ref.valor)} mg/kg (${fmt.mv((est / ref.valor) * 100)} %).` : null,
-      ctx && !ctx.fuera ? (ctx.comunidades.length ? `${ctx.comunidades.length} comunidades aguas abajo (${fmt.int(poblacion)} hab.${state.mode === 'demo' ? ', ficticio' : ''}).` : 'Sin comunidades registradas aguas abajo.') : null,
+      ctx && !ctx.fuera ? (ctx.comunidades.length ? `${ctx.comunidades.length} comunidades aguas abajo (${fmt.int(poblacion)} hab., OSM).` : 'Sin comunidades registradas aguas abajo.') : null,
       ctx && !ctx.fuera && ctx.fuentes.length ? `Aguas arriba: ${ctx.fuentes.map((f) => f.nombre).join(', ')}.` : null,
       `Tomada el ${fmt.dateOnly(m.fecha_iso)} por ${m.responsable || '—'}.`,
     ].filter(Boolean);

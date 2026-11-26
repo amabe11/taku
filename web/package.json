@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host",
+    "alcoche": "node --max-old-space-size=4096 scripts/build-alcoche.mjs",
     "map": "node scripts/build-map.mjs",
     "deploy:pages": "node scripts/deploy-pages.mjs"
   },
