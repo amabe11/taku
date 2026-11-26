@@ -20,7 +20,13 @@ export async function db() {
   const client = await clientPromise;
   const d = client.db(process.env.AHG_DB || BASE_POR_DEFECTO);
   // Colecciones con validador e índices antes de la primera escritura (una vez por arranque en frío).
-  if (!globalThis.__ahgInit) globalThis.__ahgInit = inicializar(d).catch((e) => { globalThis.__ahgInit = null; throw e; });
+  // Si falla (p. ej. el usuario de Atlas no puede crear colecciones con validador), la API sigue funcionando y
+  // /api/health informa el motivo.
+  if (!globalThis.__ahgInit) {
+    globalThis.__ahgInit = inicializar(d)
+      .then(() => { globalThis.__ahgInitError = null; })
+      .catch((e) => { globalThis.__ahgInitError = { codigo: e.codeName || e.code || 'error', mensaje: String(e.message).slice(0, 200) }; setTimeout(() => { globalThis.__ahgInit = null; }, 60000); });
+  }
   await globalThis.__ahgInit;
   return d;
 }
