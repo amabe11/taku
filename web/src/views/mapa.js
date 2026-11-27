@@ -1,13 +1,13 @@
 // Vista «Mapas»: dos mapas separados del mismo territorio (Alcoche, río Coroico).
 //   1. Muestras: semáforo de priorización (qué enviar primero al laboratorio).
 //   2. MAPE: estado legal de las unidades mineras (al día · en trámite · ilegal o presunta ilegal).
-// Se mueven juntos (opcional) para comparar: ¿dónde coinciden frentes ilegales y muestras rojas?
-// En el teléfono se elige uno u otro con un selector.
+// Se ve uno por pantalla (teléfono y PC), con un selector Muestras / MAPE. Con «Mismo encuadre» el otro abre en el
+// mismo lugar, para comparar: ¿dónde coinciden frentes ilegales y muestras rojas?
 import { h, mount } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import * as fmt from '../lib/format.js';
 import { createMap } from '../components/map-canvas.js';
-import { state, on, filtradas, writePref } from '../state.js';
+import { state, on, filtradas, readPref, writePref } from '../state.js';
 import { SEMAFORO, LEGAL, colaPriorizacion, estimado, MATRICES, distanciaKm } from '../model.js';
 import { semaforoBadge, legalBadge } from '../components/badges.js';
 import { legalNote } from './common.js';
@@ -27,16 +27,24 @@ export function mapaView(focus) {
     state.ui.vincular = e.target.checked; writePref('ahg.mapas.vincular', state.ui.vincular);
     if (state.ui.vincular) mapB.setView(mapA.getView());
   } });
-  const grid = h('div', { class: 'map-pair', dataset: { ver: 'muestras' } }, mapA.el, mapB.el);
+  // Un mapa por pantalla: el selector elige cuál se ve (se recuerda). Con «Mismo encuadre», el otro mapa abre
+  // donde quedó este.
+  const inicial = focus && state.mape.some((u) => u.id === focus) ? 'mape' : readPref('ahg.mapas.ver', 'muestras') === 'mape' ? 'mape' : 'muestras';
+  const grid = h('div', { class: 'map-pair', dataset: { ver: inicial } }, mapA.el, mapB.el);
+  const ver = (v) => {
+    grid.dataset.ver = v; writePref('ahg.mapas.ver', v);
+    window.dispatchEvent(new Event('resize'));
+    if (state.ui.vincular) requestAnimationFrame(() => (v === 'mape' ? mapB.setView(mapA.getView()) : mapA.setView(mapB.getView())));
+  };
   const tab = (v, label, ic) => h('label', { class: 'seg-opt' },
-    h('input', { type: 'radio', name: 'map-ver', value: v, checked: v === 'muestras' || null, onchange: () => { grid.dataset.ver = v; window.dispatchEvent(new Event('resize')); } }),
+    h('input', { type: 'radio', name: 'map-ver', value: v, checked: v === inicial || null, onchange: () => ver(v) }),
     icon(ic), label);
   const head = h('div', { class: 'map-head' },
     h('div', { class: 'map-head-text' },
       h('h1', { tabindex: '-1', 'data-view-title': '' }, 'Mapas · Alcoche, Caranavi'),
       h('p', null, 'Río Coroico → Kaka. Mapa de muestras: qué enviar primero al laboratorio. Mapa MAPE: la minería y su situación legal.')),
     h('fieldset', { class: 'seg', 'aria-label': 'Mapa visible' }, h('legend', { class: 'sr-only' }, 'Mapa visible'), tab('muestras', 'Muestras', 'flask'), tab('mape', 'MAPE', 'pick')),
-    h('label', { class: 'check check-inline', for: 'map-link' }, linkIn, h('span', null, icon('link'), ' Mover los dos mapas juntos')));
+    h('label', { class: 'check check-inline', for: 'map-link' }, linkIn, h('span', null, icon('link'), ' Mismo encuadre en los dos mapas')));
 
   const resumen = h('section', { class: 'map-summary', 'aria-label': 'Resumen' });
   function render() {

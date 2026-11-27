@@ -15,6 +15,7 @@ import { mapeView } from './views/mape.js';
 import { sitioView } from './views/sitio.js';
 import { configuracionView } from './views/configuracion.js';
 import { lectorView } from './views/lector.js';
+import { simuladorView } from './views/simulador.js';
 
 // Popover API: los navegadores sin soporte muestran las fichas como hojas fijas (ver CSS @supports).
 if (!Object.hasOwn(HTMLElement.prototype, 'popover')) {
@@ -46,6 +47,7 @@ const ROUTES = {
   metodo: metodoView,
   configuracion: configuracionView,
   lector: lectorView,
+  simulador: simuladorView,
 };
 const NAV_OF = { muestra: 'muestras' };
 const TITLES = { mapa: 'Mapas', lector: 'Lector en vivo' };

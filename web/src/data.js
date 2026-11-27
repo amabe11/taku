@@ -19,7 +19,14 @@ export async function loadMuestras() {
   store.useDb(state.mode);
   state.persistent = await store.ready();
   if (state.mode === 'demo') {
-    if (readPref('ahg.demo.version', '') !== DEMO_VERSION || !(await store.listMuestras()).length) {
+    // Un lote elegido en el «Simulador de datos» mientras se usaba el servidor: se carga al entrar al modo simulación.
+    const pendiente = readPref(LOTE_PENDIENTE, null);
+    if (Array.isArray(pendiente) && pendiente.length) {
+      await store.clearMuestras();
+      await store.putMuestras(pendiente);
+      writePref('ahg.demo.version', DEMO_VERSION);
+      try { localStorage.removeItem(LOTE_PENDIENTE); } catch { /* sin almacenamiento */ }
+    } else if (readPref('ahg.demo.version', '') !== DEMO_VERSION || !(await store.listMuestras()).length) {
       await store.clearMuestras();
       await store.putMuestras(demoMuestras());
       writePref('ahg.demo.version', DEMO_VERSION);
@@ -83,6 +90,22 @@ export async function importMuestras(list) {
   await refresh();
   if (state.mode === 'nube' && nuevas.length) syncNube();
   return nuevas.length;
+}
+
+const LOTE_PENDIENTE = 'ahg.sim.pendiente';
+
+/**
+ * Muestra en la web un lote del «Simulador de datos». En modo simulación reemplaza (o agrega a) las muestras de
+ * este navegador. En modo servidor no mezcla nada con la copia del servidor: guarda el lote y devuelve false para
+ * que la vista cambie al modo simulación, que lo carga al arrancar.
+ */
+export async function usarLote(lote, { agregar = false } = {}) {
+  if (state.mode !== 'demo') { writePref(LOTE_PENDIENTE, lote); return false; }
+  if (!agregar) await store.clearMuestras();
+  await store.putMuestras(lote);
+  writePref('ahg.demo.version', DEMO_VERSION);
+  await refresh();
+  return true;
 }
 
 export async function resetDemo() { await store.clearMuestras(); await store.putMuestras(demoMuestras()); state.mape = demoMape(); emit('mape'); await refresh(); }

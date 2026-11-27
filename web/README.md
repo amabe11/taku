@@ -55,6 +55,10 @@ npm run deploy:pages    # publica en GitHub Pages (rama gh-pages)
 `?demo=1` fuerza la demostración y `?demo=0` el servidor. En demostración todo es ficticio (`demostracion: true`,
 códigos `DEMO-…`): muestras, comunidades, población, frentes mineros y resultados de laboratorio.
 
+## Simulador de datos (`#/simulador`)
+
+Menú **Muestras → Simulador de datos** (o «Elegir datos simulados» en la franja de demostración). Escenarios sobre el sitio real: campaña Alcoche (fija), línea base, frente minero activo, aguas abajo de Guanay, solo peces y personalizado (número de muestras, matrices, tramo en km del eje, nivel de mercurio, % de controles fallidos, % con laboratorio, período y semilla). Vista previa con el semáforo y acciones: usar en la web, agregar, enviar al servidor (`/api/sync`, con la clave) y descargar JSON. Todo sale `demostracion: true`; la misma semilla da los mismos códigos, así que reenviar no duplica. Generador: `src/data/escenarios.js`.
+
 ## Registro de muestra (contrato con la app modo técnico y el firmware)
 
 Campos de la sección 7.6 + lo que el ESP32 envía por Bluetooth (6.1). La app lo sincroniza con `POST /api/sync`

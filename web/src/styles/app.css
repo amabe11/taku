@@ -192,6 +192,9 @@
   .demo-banner[hidden] { display: none; }
   .demo-banner strong { color: var(--state-demo); }
   .demo-banner .link-btn { margin-inline-start: auto; }
+  .banner-links { display: flex; flex-wrap: wrap; gap: var(--sp-1, 4px) var(--sp-3); justify-content: flex-end; }
+  .banner-links .link-btn { margin: 0; }
+  @media (width < 48rem) { .demo-banner .banner-links { grid-column: 2; justify-content: flex-start; } }
 
   .offline-banner {
     padding: var(--sp-2) var(--sp-4); background: var(--color-panel); border-bottom: 1px solid var(--color-border-strong); font-size: var(--fs-sm);
@@ -330,7 +333,7 @@
   .legend-row { display: flex; align-items: center; gap: var(--sp-2); }
   .legend-row .count { margin-inline-start: auto; font-family: var(--font-mono); color: var(--color-text); }
   .legend-note { border-top: 1px solid var(--color-border); padding-top: 6px; margin-top: 2px; color: var(--color-text); }
-  .map-sources { position: absolute; z-index: 2; inset-inline-end: var(--sp-3); bottom: var(--sp-2); font-size: var(--fs-xs); color: var(--color-text-muted); }
+  .map-sources { position: absolute; z-index: 2; inset-inline-end: var(--sp-3); bottom: var(--sp-2); max-width: calc(100% - 320px - 2 * var(--sp-3)); text-align: end; font-size: var(--fs-xs); color: var(--color-text-muted); }
   .chip {
     display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 36px; padding: 0 var(--sp-3); border-radius: var(--r-pill);
     background: color-mix(in oklab, var(--color-panel) 90%, transparent); border: 1px solid var(--color-border-strong); backdrop-filter: blur(8px);

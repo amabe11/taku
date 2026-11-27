@@ -15,6 +15,7 @@ export const NAV = [
     ['priorizacion', 'Cola de laboratorio', 'queue'],
     ['cuenca', 'Vista de cuenca', 'river'],
     ['indicadores', 'Indicadores', 'gauge'],
+    ['simulador', 'Simulador de datos', 'beaker_demo'],
   ] },
   { caption: 'Comunidad', items: [
     ['alertas', 'Avisos comunitarios', 'bell'],
@@ -121,7 +122,9 @@ export function createShell() {
         h('span', null, h('strong', null, 'Simulación'),
           h('span', { class: 'banner-long' }, ' — el lugar, los ríos y las huellas mineras son reales; las muestras, los resultados de laboratorio y el estado legal de las cooperativas son simulados.'),
           h('span', { class: 'banner-short' }, ': sitio real, muestras simuladas.')),
-        h('button', { class: 'link-btn', type: 'button', onclick: () => switchMode('nube') }, 'Usar el servidor'));
+        h('span', { class: 'banner-links' },
+          h('a', { class: 'link-btn', href: '#/simulador' }, 'Elegir datos simulados'),
+          h('button', { class: 'link-btn', type: 'button', onclick: () => switchMode('nube') }, 'Usar el servidor')));
     } else if (n.status === 'error' || n.status === 'sin_config') {
       banner.hidden = false;
       banner.className = 'offline-banner';

@@ -398,16 +398,70 @@ export function createMap({ id = 'mapa', modo = 'muestras', focus, titulo, onVie
     const { sc, ox, oy, r } = screenFit();
     return [vb.x + (clientX - r.left - ox) / sc, vb.y + (clientY - r.top - oy) / sc];
   }
-  let drag = null;
-  svg.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, vb: { ...vb } }; svg.setPointerCapture(e.pointerId); });
-  svg.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    const { sc } = screenFit();
-    setVb({ ...drag.vb, x: drag.vb.x - (e.clientX - drag.x) / sc, y: drag.vb.y - (e.clientY - drag.y) / sc }, { load: false });
+  // Interacción: arrastrar (un dedo o el mouse), pellizcar (dos dedos) y rueda. Los movimientos se juntan y se
+  // aplican una vez por cuadro (requestAnimationFrame): así el mapa no se traba ni salta con trackpads o con
+  // los dos mapas vinculados. Las imágenes satelitales se piden al soltar.
+  const punteros = new Map();
+  let drag = null, pinch = null, frame = 0, pendiente = null, rueda = null;
+  function programar(fn) {
+    pendiente = fn;
+    if (!frame) frame = requestAnimationFrame(() => { frame = 0; const f = pendiente; pendiente = null; f?.(); });
+  }
+  const iniciarArrastre = (p) => { drag = { x: p.x, y: p.y, vb: { ...vb } }; };
+  function iniciarPellizco() {
+    const [a, b] = [...punteros.values()];
+    const { sc, ox, oy, r } = screenFit();
+    const mid = [(a.x + b.x) / 2, (a.y + b.y) / 2];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, vb: { ...vb }, sc, ox, oy, r, P: [vb.x + (mid[0] - r.left - ox) / sc, vb.y + (mid[1] - r.top - oy) / sc] };
+    drag = null;
+  }
+  svg.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
+    punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    svg.setPointerCapture(e.pointerId);
+    if (punteros.size === 1) iniciarArrastre({ x: e.clientX, y: e.clientY });
+    else if (punteros.size === 2) iniciarPellizco();
   });
-  const endDrag = () => { if (drag && nasa.activas.length) requestNasa(); drag = null; };
-  svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
-  svg.addEventListener('wheel', (e) => { e.preventDefault(); const [mx, my] = clientToMap(e.clientX, e.clientY); zoom(e.deltaY > 0 ? 1.2 : 1 / 1.2, mx, my); }, { passive: false });
+  svg.addEventListener('pointermove', (e) => {
+    if (!punteros.has(e.pointerId)) return;
+    punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && punteros.size >= 2) {
+      const [a, b] = [...punteros.values()];
+      const f = pinch.d / (Math.hypot(a.x - b.x, a.y - b.y) || 1);
+      const mid = [(a.x + b.x) / 2, (a.y + b.y) / 2];
+      const sc = pinch.sc / f;
+      programar(() => setVb({
+        w: pinch.vb.w * f, h: pinch.vb.h * f,
+        x: pinch.P[0] - (mid[0] - pinch.r.left - pinch.ox) / sc, y: pinch.P[1] - (mid[1] - pinch.r.top - pinch.oy) / sc,
+      }, { load: false }));
+    } else if (drag) {
+      const { sc } = screenFit();
+      if (!sc) return;
+      const d = drag;
+      programar(() => setVb({ ...d.vb, x: d.vb.x - (e.clientX - d.x) / sc, y: d.vb.y - (e.clientY - d.y) / sc }, { load: false }));
+    }
+  });
+  const soltar = (e) => {
+    if (!punteros.delete(e.pointerId)) return;
+    if (punteros.size === 1) { pinch = null; iniciarArrastre([...punteros.values()][0]); return; } // de dos dedos a uno: sin salto
+    if (punteros.size === 0) { drag = null; pinch = null; if (nasa.activas.length) requestNasa(); }
+  };
+  svg.addEventListener('pointerup', soltar); svg.addEventListener('pointercancel', soltar);
+  svg.addEventListener('lostpointercapture', soltar);
+  // Rueda: zoom proporcional al desplazamiento (los trackpads mandan muchos eventos pequeños), acumulado por cuadro.
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    const f = Math.exp(Math.max(-150, Math.min(150, dy)) * (e.ctrlKey ? 0.01 : 0.0022)); // ctrlKey = pellizco del trackpad
+    rueda = { f: (rueda?.f ?? 1) * f, x: e.clientX, y: e.clientY };
+    programar(() => {
+      const r = rueda; rueda = null;
+      if (!r) return;
+      const [mx, my] = clientToMap(r.x, r.y);
+      zoom(r.f, mx, my);
+    });
+  }, { passive: false });
+  svg.addEventListener('dblclick', (e) => { e.preventDefault(); const [mx, my] = clientToMap(e.clientX, e.clientY); zoom(e.shiftKey ? 1.8 : 1 / 1.8, mx, my); });
   svg.addEventListener('keydown', (e) => {
     const step = vb.w * 0.12;
     const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
@@ -447,7 +501,8 @@ export function createMap({ id = 'mapa', modo = 'muestras', focus, titulo, onVie
   return {
     el: root, fitTo,
     getView: () => ({ ...vb }),
-    setView: (v) => setVb({ ...v }, { silent: true }),
-    destroy() { offs.forEach((f) => f()); filt?.destroy(); clearTimeout(nasaTimer); if (popup.matches(':popover-open')) popup.hidePopover(); },
+    // Un encuadre recibido del otro mapa (aunque este esté oculto) reemplaza el encuadre inicial por defecto.
+    setView: (v) => { fitted = true; setVb({ ...v }, { silent: true }); },
+    destroy() { offs.forEach((f) => f()); filt?.destroy(); clearTimeout(nasaTimer); cancelAnimationFrame(frame); if (popup.matches(':popover-open')) popup.hidePopover(); },
   };
 }

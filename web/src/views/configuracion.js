@@ -25,7 +25,8 @@ export function configuracionView() {
         h('span', null, 'Servidor Ahgora', h('small', null, 'Muestras que la app modo técnico sincronizó (MongoDB, vía la API del equipo). Los cambios de esta web se envían al servidor.'))),
       h('label', { class: 'check' }, h('input', { type: 'radio', name: 'modo', value: 'demo', checked: state.mode === 'demo' || null }),
         h('span', null, 'Simulación', h('small', null, 'Sitio real (Alcoche) con muestras, resultados de laboratorio y estados legales simulados. Todo queda marcado como demostración y no se envía al servidor salvo que lo pidas abajo.')))),
-    h('div', { class: 'view-actions' }, h('button', { class: 'btn btn-primary', type: 'submit' }, 'Aplicar')));
+    h('div', { class: 'view-actions' }, h('button', { class: 'btn btn-primary', type: 'submit' }, 'Aplicar'),
+      h('a', { class: 'btn btn-ghost', href: '#/simulador' }, icon('beaker_demo'), 'Elegir datos simulados')));
 
   // ---------------- servidor
   const cc = cloudCfg();
