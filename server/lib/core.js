@@ -271,6 +271,7 @@ export function limpiarReporte(b) {
     zona = zonaPublica(lat + 0.05, lon + 0.05);
   }
   const creado = new Date(b.creado_en);
+  const kit = limpiarKit(b.kit);
   return {
     reporte: {
       tipo: b.tipo,
@@ -279,6 +280,24 @@ export function limpiarReporte(b) {
       creado_en: Number.isNaN(creado.getTime()) ? null : creado,
       origen: String(b.origen ?? '').slice(0, 60),
       estado: 'en_revision',
+      ...(kit ? { kit } : {}),
     },
+  };
+}
+
+// Medición comunitaria con el kit (después del video tutorial). Llega como reporte: orienta el muestreo,
+// no es un resultado ni un aviso. Solo se guardan estos campos, acotados.
+export const RESULTADOS_KIT = new Set(['sin_cambio', 'cambio_leve', 'cambio_fuerte', 'no_seguro', 'invalido']);
+export function limpiarKit(k) {
+  if (!k || typeof k !== 'object' || !RESULTADOS_KIT.has(k.resultado)) return null;
+  const entero = (v, max) => (Number.isInteger(Number(v)) && Number(v) >= 0 ? Math.min(Number(v), max) : null);
+  return {
+    resultado: k.resultado,
+    matriz: k.matriz === 'cola' ? 'cola' : 'sedimento',
+    cloro_sin_color: typeof k.cloro_sin_color === 'boolean' ? k.cloro_sin_color : null,
+    pasos_hechos: entero(k.pasos_hechos, 50),
+    pasos_total: entero(k.pasos_total, 50),
+    tutorial_visto: k.tutorial_visto === true,
+    rio: String(k.rio ?? '').trim().slice(0, 60),
   };
 }

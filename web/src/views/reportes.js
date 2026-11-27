@@ -26,6 +26,17 @@ const tipoTag = (tipo) => {
   return h('span', { class: 'chip' }, icon(t.icon), t.label);
 };
 
+// Medición comunitaria con el kit (Ahgora Comunidad, después del video tutorial). Orienta el muestreo: no es resultado.
+const RESULTADO_KIT = {
+  sin_cambio: 'Sin cambio de color', cambio_leve: 'Cambio leve', cambio_fuerte: 'Cambio fuerte',
+  no_seguro: 'No está seguro', invalido: 'Prueba no válida (cloro)',
+};
+const kitTag = (k) => h('span', { class: 'chip' }, icon('flask'), `Medición con el kit · ${RESULTADO_KIT[k.resultado] || k.resultado}`);
+const kitDetalle = (k) => h('span', { class: 'meta' },
+  `${k.matriz === 'cola' ? 'Cola minera' : 'Sedimento'}${k.rio ? ` · ${k.rio}` : ''}`,
+  k.pasos_total ? ` · ${k.pasos_hechos ?? 0} de ${k.pasos_total} pasos` : '',
+  k.tutorial_visto ? ' · vio el tutorial' : ' · sin tutorial');
+
 export function reportesView() {
   const host = h('div', { class: 'stack' });
   const filtros = { tipo: '', periodo: '30' };
@@ -119,11 +130,12 @@ export function reportesView() {
         h('h2', { class: 'section-title', id: 'rep-l' }, `Reportes · ${lista.length}`),
         lista.length ? h('ul', { class: 'alert-list' }, lista.map((r) => h('li', { class: 'card' },
           h('div', { class: 'card-head' },
-            tipoTag(r.tipo),
+            r.kit ? kitTag(r.kit) : tipoTag(r.tipo),
             h('span', { class: 'meta' }, fmt.dateTime(r.creado_en || r.recibido_en))),
           h('p', { style: { margin: 'var(--sp-2) 0' } }, r.descripcion || h('span', { class: 'meta' }, 'Sin detalles.')),
           h('div', { class: 'badge-row' },
             h('span', { class: 'meta' }, nombreZona(r.zona)),
+            r.kit ? kitDetalle(r.kit) : null,
             h('span', { class: 'chip chip-dashed' }, 'En revisión'),
             r.demostracion ? h('span', { class: 'prov', dataset: { prov: 'archivo_prueba' } }, 'Demostración') : null))))
           : emptyState({ iconName: 'flag', title: 'Sin reportes', text: state.mode === 'demo' ? 'No hay reportes de ejemplo con estos filtros.' : 'Todavía no llegaron reportes desde Ahgora Comunidad, o no hay con estos filtros.' })));

@@ -64,3 +64,13 @@ test('la colección lecturas tiene esquema e índice con vencimiento de 30 días
   const ttl = INDICES.lecturas.find(([, o]) => o?.expireAfterSeconds);
   assert.equal(ttl[1].expireAfterSeconds, 30 * 86400);
 });
+
+test('reporte con medición del kit comunitario: se conserva acotado; sin kit válido no se agrega', async () => {
+  const { limpiarReporte } = await import('../lib/core.js');
+  const { reporte } = limpiarReporte({ tipo: 'otro', descripcion: 'Medición con el kit', creado_en: '2026-11-26T10:00:00Z',
+    kit: { resultado: 'cambio_fuerte', matriz: 'sedimento', cloro_sin_color: true, pasos_hechos: 9, pasos_total: 10, tutorial_visto: true, rio: 'Río Coroico', extra: 'x' } });
+  assert.deepEqual(reporte.kit, { resultado: 'cambio_fuerte', matriz: 'sedimento', cloro_sin_color: true, pasos_hechos: 9, pasos_total: 10, tutorial_visto: true, rio: 'Río Coroico' });
+  assert.equal(reporte.tipo, 'otro');
+  assert.equal(limpiarReporte({ tipo: 'otro', kit: { resultado: 'hay_mercurio' } }).reporte.kit, undefined);
+  assert.equal(limpiarReporte({ tipo: 'otro' }).reporte.kit, undefined);
+});
