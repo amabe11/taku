@@ -1,0 +1,54 @@
+{
+  // AHGORA · abrir con VS Code: Archivo > Abrir área de trabajo desde archivo… > este archivo.
+  // · PlatformIO reconoce sedimentos_AHG-SED-01 y peces_AHG-PEZ-01 (compilar y cargar en el ESP32 real).
+  // · ahgora_lector_wifi se carga con el Arduino IDE (ver README.md).
+  // · Terminal > Ejecutar tarea… > «PC: simular …» corre el firmware en la PC, sin placa.
+  // · «Servidor: cargar lecturas .jsonl a la base» manda lo simulado a MongoDB (pide la clave; no la guarda).
+  "folders": [
+    { "name": "firmware (simulador en PC)", "path": "." },
+    { "name": "ahgora_lector_wifi", "path": "ahgora_lector_wifi" },
+    { "name": "sedimentos_AHG-SED-01", "path": "sedimentos_AHG-SED-01" },
+    { "name": "peces_AHG-PEZ-01", "path": "peces_AHG-PEZ-01" }
+  ],
+  "settings": {
+    "files.associations": { "*.ino": "cpp" }
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "PC: simular sedimentos (AHG-SED-01)",
+        "type": "shell",
+        "command": "cmd",
+        "args": ["/c", "${workspaceFolder:firmware (simulador en PC)}\\correr_sedimentos_pc.bat"],
+        "group": { "kind": "build", "isDefault": true },
+        "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "clear": true },
+        "problemMatcher": []
+      },
+      {
+        "label": "PC: simular peces (AHG-PEZ-01)",
+        "type": "shell",
+        "command": "cmd",
+        "args": ["/c", "${workspaceFolder:firmware (simulador en PC)}\\correr_peces_pc.bat"],
+        "group": "build",
+        "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "clear": true },
+        "problemMatcher": []
+      },
+      {
+        "label": "Servidor: cargar lecturas .jsonl a la base",
+        "type": "shell",
+        "command": "node",
+        "args": ["${workspaceFolder:firmware (simulador en PC)}\\..\\server\\scripts\\cargar-jsonl.mjs",
+          "${workspaceFolder:firmware (simulador en PC)}\\lecturas_AHG-SED-01.jsonl",
+          "${workspaceFolder:firmware (simulador en PC)}\\lecturas_AHG-PEZ-01.jsonl"],
+        "options": { "env": { "AHG_TEAM_KEY": "${input:claveEquipo}" } },
+        "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "clear": true },
+        "problemMatcher": []
+      }
+    ],
+    "inputs": [
+      { "id": "claveEquipo", "type": "promptString", "password": true,
+        "description": "Clave del equipo (AHG_TEAM_KEY) o del lector (AHG_NODE_KEY). No se guarda." }
+    ]
+  }
+}

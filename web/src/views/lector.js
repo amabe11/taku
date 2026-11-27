@@ -63,6 +63,7 @@ export function lectorView() {
     return h('button', { type: 'button', class: 'card lector-nodo', 'aria-pressed': String(n.node_id === elegido),
       onclick: () => { elegido = n.node_id; datos = null; render(); cargar(); } },
     h('div', { class: 'card-head' }, h('strong', null, n.node_id),
+      n.ultima.simulado ? h('span', { class: 'prov', dataset: { prov: 'archivo_prueba' } }, 'Simulado') : null,
       h('span', { class: 'pill', dataset: { conn: vivo ? 'online' : 'offline' } }, icon(vivo ? 'wifi' : 'wifi_off'), vivo ? 'Enviando' : 'Sin señal')),
     h('p', { class: 'meta', style: { margin: 0 } },
       `Última lectura ${fmt.ago(new Date(n.ultima.recibido_en).getTime())} · ${fmt.int(n.total_24h)} en 24 h`,
@@ -81,10 +82,11 @@ export function lectorView() {
     const nodos = datos.nodos || [];
     if (!nodos.length) {
       mount(host, emptyState({ iconName: 'wifi', title: 'Todavía no llegó ninguna lectura',
-        text: 'Enciende el lector con el firmware «ahgora_lector_wifi», activa el hotspot del celular (2,4 GHz) y espera unos segundos. En el Monitor Serie debe aparecer «ENVIO: 10 lecturas al servidor».' }));
+        text: 'Enciende el lector con el firmware «ahgora_lector_wifi», activa el hotspot del celular (2,4 GHz) y espera unos segundos. En el Monitor Serie debe aparecer «ENVIO: 10 lecturas al servidor». Sin placa: corre el simulador en PC (firmware/) y carga sus lecturas con «node scripts/cargar-jsonl.mjs» desde server/.' }));
       return;
     }
     const u = lect[0];
+    const pez = lect.some((l) => l.cubeta != null); // lector de peces (AHG-PEZ-01): cubeta e índice q
     const ult10 = lect.slice(0, 10);
     const prom = ult10.length ? { r: media(ult10.map((l) => l.r)), g: media(ult10.map((l) => l.g)), b: media(ult10.map((l) => l.b)), c: media(ult10.map((l) => l.c)) } : null;
     const variacion = ult10.length > 1 ? cv(ult10.map((l) => l.c)) : null;
@@ -100,7 +102,7 @@ export function lectorView() {
           h('figure', null, h('span', { class: 'swatch', style: { background: colorAprox(u) }, 'aria-hidden': 'true' }), h('figcaption', null, 'Color aprox.')),
           h('p', { style: { margin: 0 } },
             h('span', { class: 'stat-v' }, `R ${fmt.int(u.r)} · G ${fmt.int(u.g)} · B ${fmt.int(u.b)} · C ${fmt.int(u.c)}`), h('br'),
-            h('span', { class: 'meta' }, `Lectura ${u.seq} · ${fmt.time(hora(u))}${u.test_mode ? ' · modo prueba' : ''}`))),
+            h('span', { class: 'meta' }, `Lectura ${u.seq} · ${fmt.time(hora(u))}${u.test_mode ? ' · modo prueba' : ''}${u.simulado ? ' · simulada en PC' : ''}${u.cubeta ? ` · cubeta ${u.cubeta}` : ''}${u.q != null ? ` · q = ${fmt.tc(u.q)}` : ''}`))),
         prom ? h('p', { class: 'meta', style: { margin: 0 } },
           h('b', null, `Promedio de las últimas ${ult10.length}: `),
           `R ${fmt.int(prom.r)} · G ${fmt.int(prom.g)} · B ${fmt.int(prom.b)} · C ${fmt.int(prom.c)}. `,
@@ -114,11 +116,13 @@ export function lectorView() {
         h('h2', { class: 'section-title', id: 'lec-t' }, 'Últimas lecturas'),
         h('div', { class: 'table-wrap' }, h('table', { class: 'data-table compact' },
           h('caption', null, 'Señal cruda del TCS34725. Hora de medición del ESP32 (o de llegada si aún no tenía hora).'),
-          h('thead', null, h('tr', null, ['Hora', 'N.º', 'R', 'G', 'B', 'C', 'r/c', 'g/c', 'b/c'].map((t, i) => h('th', { scope: 'col', class: i > 0 ? 'num' : null }, t)))),
+          h('thead', null, h('tr', null, ['Hora', 'N.º', ...(pez ? ['Cubeta'] : []), 'R', 'G', 'B', 'C', 'r/c', 'g/c', 'b/c', ...(pez ? ['q'] : [])].map((t, i) => h('th', { scope: 'col', class: i > 0 && t !== 'Cubeta' ? 'num' : null }, t)))),
           h('tbody', null, lect.slice(0, 20).map((l) => h('tr', null,
             h('td', null, fmt.time(hora(l))), h('td', { class: 'num' }, l.seq),
+            pez ? h('td', null, l.cubeta || '—') : null,
             [l.r, l.g, l.b, l.c].map((v) => h('td', { class: 'num' }, fmt.int(v))),
-            [l.r_norm, l.g_norm, l.b_norm].map((v) => h('td', { class: 'num' }, fmt.tc(v))))))))),
+            [l.r_norm, l.g_norm, l.b_norm].map((v) => h('td', { class: 'num' }, fmt.tc(v))),
+            pez ? h('td', { class: 'num' }, l.q != null ? fmt.tc(l.q) : '—') : null)))))),
       h('p', { class: 'legal-note' }, icon('info'), 'Señal óptica cruda del sensor: no es concentración de mercurio. El resultado de una muestra lo da el procedimiento completo y, para confirmar, el laboratorio.'));
   }
 

@@ -55,7 +55,8 @@ rechaza documentos sin los campos mínimos. Estructura según la guía vigente (
   colecciones, carga el sitio Alcoche, sus antecedentes y zonas, y envía 25 muestras y 13 unidades mineras simuladas.
 - **Simulador del ESP32** (desde `server/`): `node scripts/simular-esp32.mjs --key <clave> --n 6 --cada 20` envía una
   muestra cada 20 s con lecturas crudas, cálculo y semáforo, como la app modo técnico. `--seco` las imprime sin enviar.
-- «Borrar simulación» deja la base solo con datos reales.
+- **Puente `.jsonl` → base** (desde `server/`): `node scripts/cargar-jsonl.mjs ../firmware/lecturas_AHG-SED-01.jsonl ../firmware/lecturas_AHG-PEZ-01.jsonl --key <clave>` carga a la colección «lecturas» lo que grabó el simulador en PC (`firmware/pc_sim`) o lo copiado del Monitor Serie (`--real`). Repetir no duplica; `--seco` solo cuenta. Ver `firmware/README.md`.
+- «Borrar simulación» deja la base solo con datos reales (también quita las lecturas `simulado: true`).
 
 Probado de punta a punta con MongoDB real (mongodb-memory-server) el 25 nov 2026: validadores activos, 25 muestras,
 5 avisos públicos, retiro con versión 2 visible en `?desde=`, sin duplicados al repetir, 401 sin clave.

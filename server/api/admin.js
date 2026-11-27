@@ -4,7 +4,8 @@
 //        crea las colecciones con su validador e índices y carga el sitio piloto (Alcoche), sus antecedentes y
 //        las zonas públicas con su contacto. Idempotente: repetirlo actualiza por `id`.
 //   POST { accion: 'borrar_demostracion' }
-//        borra solo lo marcado `demostracion: true` (muestras, avisos y MAPE simulados). Lo real no se toca.
+//        borra solo lo marcado `demostracion: true` (muestras, avisos y MAPE simulados) y las lecturas `simulado: true`.
+//        Lo real no se toca.
 import { handler, db } from '../lib/core.js';
 import { inicializar, ESQUEMAS } from '../lib/esquema.js';
 
@@ -19,7 +20,8 @@ async function estado(d) {
       existe: !!c,
       validador: !!c?.options?.validator,
       documentos: c ? await d.collection(nombre).estimatedDocumentCount() : 0,
-      demostracion: c && ['muestras', 'mape', 'avisos'].includes(nombre) ? await d.collection(nombre).countDocuments({ demostracion: true }) : undefined,
+      demostracion: c && ['muestras', 'mape', 'avisos'].includes(nombre) ? await d.collection(nombre).countDocuments({ demostracion: true })
+        : c && nombre === 'lecturas' ? await d.collection(nombre).countDocuments({ simulado: true }) : undefined,
     };
   }
   return { base: d.databaseName, colecciones };
@@ -48,6 +50,7 @@ export default handler(async (req, res) => {
   if (b.accion === 'borrar_demostracion') {
     const borrados = {};
     for (const col of ['muestras', 'avisos', 'mape']) borrados[col] = (await d.collection(col).deleteMany({ demostracion: true })).deletedCount;
+    borrados.lecturas = (await d.collection('lecturas').deleteMany({ simulado: true })).deletedCount;
     await d.collection('bitacora').insertOne({ fecha: ahora, accion: 'borrar_demostracion', por: String(b.por || 'Ahgora Web').slice(0, 120), detalle: JSON.stringify(borrados) });
     return res.status(200).json({ ok: true, borrados, ...(await estado(d)) });
   }

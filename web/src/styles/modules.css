@@ -323,3 +323,15 @@
   .sim-total .mono { font-size: var(--fs-xl, 1.5rem); font-weight: 700; }
   .sim-actions { margin-top: var(--sp-2); }
 }
+
+/* ===================================================================== origen de los datos (siempre visible) */
+@layer components {
+  .foot-mode { display: grid; gap: 6px; }
+  .foot-cap { font-size: var(--fs-xs); font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .seg-mode { width: 100%; }
+  .seg-mode .seg-opt { flex: 1; justify-content: center; padding: 0 var(--sp-2); font-size: var(--fs-xs); }
+  .map-aviso:empty { display: none; }
+  .map-aviso-card { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); border-color: color-mix(in oklab, var(--state-demo) 45%, var(--color-border)); }
+  .map-aviso-card > svg { width: 22px; height: 22px; flex: none; color: var(--state-demo); }
+  .map-aviso-card p { flex: 1 1 320px; margin: 0; font-size: var(--fs-sm); }
+}

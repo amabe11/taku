@@ -74,3 +74,24 @@ test('reporte con mediciÃ³n del kit comunitario: se conserva acotado; sin kit vÃ
   assert.equal(limpiarReporte({ tipo: 'otro', kit: { resultado: 'hay_mercurio' } }).reporte.kit, undefined);
   assert.equal(limpiarReporte({ tipo: 'otro' }).reporte.kit, undefined);
 });
+
+test('lector de peces y simulador en PC: guarda cubeta, absorbancias y la marca de simulado', () => {
+  const pez = { node_id: 'AHG-PEZ-01', seq: 19, test_mode: true, sensor: 'TCS34725', modo: 'transmision', cubeta: 'Muestra',
+    r: 7370, g: 3156, b: 4881, c: 16038, r_norm: 117.17, g_norm: 50.18, b_norm: 77.61, r_osc: 12, g_osc: 10, b_osc: 8, c_osc: 35,
+    sat: false, A_r: 0.21853, A_g: 0.5862, A_b: 0.3096, q: 0.37281, t: ahora.getTime() - 1000 };
+  const { docs, error } = limpiarLecturas({ node_id: 'AHG-PEZ-01', simulado: true, origen: 'simulador-pc', lecturas: [pez] }, ahora);
+  assert.equal(error, undefined);
+  const d = docs[0];
+  assert.equal(d.simulado, true);
+  assert.equal(d.origen, 'simulador-pc');
+  assert.equal(d.cubeta, 'Muestra');
+  assert.equal(d.modo, 'transmision');
+  assert.equal(d.sat, false);
+  assert.equal(d.q, 0.3728);
+  assert.equal(d.r_osc, 12);
+  // Una lectura real no lleva la marca, ni campos de peces si no los trae.
+  const real = limpiarLecturas(usb, ahora).docs[0];
+  assert.equal(real.simulado, undefined);
+  assert.equal(real.cubeta, undefined);
+  assert.equal(real.q, undefined);
+});

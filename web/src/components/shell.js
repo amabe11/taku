@@ -27,6 +27,15 @@ export const NAV = [
   ] },
 ];
 
+/** Selector siempre visible del origen de los datos: simulados (este navegador) o Servidor Ahgora. */
+function modeSwitch(sfx) {
+  return h('fieldset', { class: 'seg seg-mode', 'aria-label': 'Origen de los datos' },
+    h('legend', { class: 'sr-only' }, 'Origen de los datos'),
+    [['demo', 'Simulados', 'beaker_demo'], ['nube', 'Servidor', 'database']].map(([v, label, ic]) => h('label', { class: 'seg-opt' },
+      h('input', { type: 'radio', name: `modo-${sfx}`, value: v, checked: state.mode === v || null, onchange: () => switchMode(v) }),
+      icon(ic), label)));
+}
+
 const brand = () => h('div', { class: 'brand' },
   h('span', { class: 'logo-mark', 'aria-hidden': 'true' }, 'A', h('b', null, 'Hg')),
   h('div', { class: 'brand-text' }, h('div', { class: 'brand-title' }, 'Ahgora Web'), h('div', { class: 'brand-sub' }, 'Cribado de mercurio · Alcoche')));
@@ -73,7 +82,8 @@ export function createShell() {
   }, icon('collapse'), h('span', { class: 'collapse-label' }, 'Contraer menú'));
   const footMode = h('div', { class: 'foot-text' });
   const nav = h('nav', { 'aria-label': 'Principal' }, navList());
-  mount(sidebar, brand(), nav, h('div', { class: 'sidebar-foot' }, footMode, collapse));
+  mount(sidebar, brand(), nav, h('div', { class: 'sidebar-foot' },
+    h('div', { class: 'foot-text foot-mode' }, h('span', { class: 'foot-cap' }, 'Datos'), modeSwitch('side')), footMode, collapse));
   tablet.addEventListener('change', applySidebar);
   applySidebar();
 
@@ -83,6 +93,7 @@ export function createShell() {
   mount(topbar, menuBtn, brand(), topPill);
   const closeBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Cerrar menú', autofocus: true, onclick: closeDrawer }, icon('close'));
   mount(sheet, h('div', { style: { display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' } }, brand(), closeBtn),
+    h('div', { class: 'foot-mode', style: { margin: 'var(--sp-3) 0' } }, h('span', { class: 'foot-cap' }, 'Datos'), modeSwitch('drawer')),
     h('nav', { 'aria-label': 'Principal (móvil)' }, navList(() => closeDrawer())));
 
   async function openDrawer() {

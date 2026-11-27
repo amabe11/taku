@@ -115,10 +115,10 @@ export function configuracionView() {
         if (state.mode === 'nube') syncNube();
       }) }, icon('upload'), 'Preparar base y cargar simulación'),
       h('button', { class: 'btn btn-danger', type: 'button', onclick: () => conClave(async () => {
-        const ok = await formDialog({ title: '¿Borrar la simulación del servidor?', intro: 'Se borran del servidor solo los registros marcados como demostración (muestras, avisos y unidades mineras simuladas). Los datos reales no se tocan.', submit: 'Borrar simulación', danger: true });
+        const ok = await formDialog({ title: '¿Borrar la simulación del servidor?', intro: 'Se borran del servidor solo los registros marcados como demostración (muestras, avisos y unidades mineras simuladas) y las lecturas del simulador en PC. Los datos reales no se tocan.', submit: 'Borrar simulación', danger: true });
         if (!ok) return;
         const r = await borrarDemoServidor(); showEstado(r);
-        dbSay(`Borrados: ${r.borrados.muestras} muestras, ${r.borrados.avisos} avisos y ${r.borrados.mape} unidades simuladas.`);
+        dbSay(`Borrados: ${r.borrados.muestras} muestras, ${r.borrados.avisos} avisos, ${r.borrados.mape} unidades y ${r.borrados.lecturas ?? 0} lecturas simuladas.`);
         if (state.mode === 'nube') syncNube();
       }) }, 'Borrar simulación')),
     dbStatus,

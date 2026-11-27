@@ -211,7 +211,15 @@ size_t SerialPC::println(const char *s) {
   printf("%s\n", s); fflush(stdout);
   if (s[0] == '{') {
     if (!archivo) archivo = fopen(SIM_ARCHIVO, "a");
-    if (archivo) { fprintf(archivo, "%s\n", s); fflush(archivo); }
+    // En el archivo se agrega la hora de la PC ("t", ms desde 1970), como hace el lector WiFi: así el puente
+    // (server/scripts/cargar-jsonl.mjs) no duplica lecturas si se carga dos veces.
+    const size_t n = strlen(s);
+    if (archivo && n > 1 && s[n - 1] == '}') {
+      FILETIME ft; GetSystemTimeAsFileTime(&ft);
+      const double ms = ((double)ft.dwHighDateTime * 4294967296.0 + (double)ft.dwLowDateTime - 116444736000000000.0) / 10000.0;
+      fprintf(archivo, "%.*s,\"t\":%.0f}\n", (int)(n - 1), s, ms);
+      fflush(archivo);
+    }
   }
   return strlen(s) + 1;
 }

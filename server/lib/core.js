@@ -107,6 +107,11 @@ export function limpiarLecturas(body, ahora = new Date()) {
   if (!lista.length) return { error: 'Faltan lecturas' };
   if (lista.length > MAX_LECTURAS) return { error: `Demasiadas lecturas en un envío (máx. ${MAX_LECTURAS})` };
   const norm = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
+  const num4 = (v) => (v == null || !Number.isFinite(Number(v)) ? undefined : Math.round(Number(v) * 10000) / 10000);
+  // Lo que venga del simulador en PC (firmware/pc_sim, puente scripts/cargar-jsonl.mjs) queda marcado y se borra
+  // con «Borrar simulación».
+  const simulado = body.simulado === true;
+  const origen = body.origen ? String(body.origen).slice(0, 60) : undefined;
   const docs = [];
   for (const l of lista) {
     if (!l || !['r', 'g', 'b', 'c'].every((k) => entero16(l[k]))) return { error: 'Cada lectura necesita r, g, b y c enteros entre 0 y 65535' };
@@ -124,7 +129,16 @@ export function limpiarLecturas(body, ahora = new Date()) {
       sensor: String(l.sensor || body.sensor || 'TCS34725').slice(0, 40),
       firmware: String(body.firmware || '').slice(0, 60),
       rssi: Number.isFinite(Number(body.rssi)) && body.rssi !== null ? Number(body.rssi) : null,
+      ...(simulado ? { simulado: true } : {}),
+      ...(origen ? { origen } : {}),
     });
+    // Lector de peces (AHG-PEZ-01, por transmisión con AuNP): etiqueta de la cubeta, luz ambiente restada,
+    // saturación y, con la referencia I0 guardada, absorbancias e índice q = A_r / A_g. Siguen sin ser mg/kg.
+    const d = docs.at(-1);
+    if (l.modo != null) d.modo = String(l.modo).slice(0, 20);
+    if (l.cubeta != null) d.cubeta = String(l.cubeta).slice(0, 40);
+    if (typeof l.sat === 'boolean') d.sat = l.sat;
+    for (const k of ['r_osc', 'g_osc', 'b_osc', 'c_osc', 'A_r', 'A_g', 'A_b', 'q']) { const v = num4(l[k]); if (v !== undefined) d[k] = v; }
   }
   return { docs };
 }

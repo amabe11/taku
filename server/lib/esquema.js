@@ -116,6 +116,9 @@ export const ESQUEMAS = {
       medido_en: { bsonType: ['date', 'null'] },
       recibido_en: { bsonType: 'date' },
       test_mode: bool, sensor: str, firmware: str, rssi: numONull,
+      simulado: bool, origen: str,
+      // lector de peces (AHG-PEZ-01)
+      modo: str, cubeta: str, sat: bool, r_osc: num, g_osc: num, b_osc: num, c_osc: num, A_r: num, A_g: num, A_b: num, q: num,
     },
   },
   // Sitio piloto: Alcoche (Caranavi). Eje del río, comunidades, frentes y antecedentes.

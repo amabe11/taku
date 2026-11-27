@@ -11,6 +11,7 @@ import { state, on, filtradas, readPref, writePref } from '../state.js';
 import { SEMAFORO, LEGAL, colaPriorizacion, estimado, MATRICES, distanciaKm } from '../model.js';
 import { semaforoBadge, legalBadge } from '../components/badges.js';
 import { legalNote } from './common.js';
+import { switchMode } from '../components/shell.js';
 
 export function mapaView(focus) {
   let bloqueo = false;
@@ -47,7 +48,15 @@ export function mapaView(focus) {
     h('label', { class: 'check check-inline', for: 'map-link' }, linkIn, h('span', null, icon('link'), ' Mismo encuadre en los dos mapas')));
 
   const resumen = h('section', { class: 'map-summary', 'aria-label': 'Resumen' });
+  // En modo servidor, si el servidor todavía no tiene muestras, se ofrece pasar a los datos simulados.
+  const aviso = h('div', { class: 'map-aviso', role: 'status' });
   function render() {
+    const vacio = state.mode === 'nube' && !state.muestras.length && !['idle', 'sync'].includes(state.nube.status);
+    mount(aviso, vacio ? h('div', { class: 'card map-aviso-card' }, icon('info'),
+      h('p', null, h('strong', null, 'El servidor no tiene muestras todavía. '), 'Para probar la web con datos falsos, usa los datos simulados (o carga una simulación al servidor desde el simulador).'),
+      h('div', { class: 'view-actions' },
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => switchMode('demo') }, icon('beaker_demo'), 'Ver datos simulados'),
+        h('a', { class: 'btn btn-ghost', href: '#/simulador' }, 'Abrir el simulador'))) : null);
     const list = filtradas();
     const { enCola, repetir } = colaPriorizacion(list, state.cuenca);
     const bar = h('div', { class: 'sem-bar', role: 'img', 'aria-label': Object.entries(SEMAFORO).map(([key, v]) => `${v.label}: ${list.filter((m) => m.semaforo === key).length}`).join(', ') },
@@ -79,6 +88,6 @@ export function mapaView(focus) {
   }
   const offs = [on('muestras', render), on('filtros', render), on('nube', render), on('mape', render)];
   render();
-  const el = h('div', { class: 'view-maps' }, head, grid, resumen);
+  const el = h('div', { class: 'view-maps' }, head, aviso, grid, resumen);
   return { el, destroy() { mapA.destroy(); mapB.destroy(); offs.forEach((f) => f()); } };
 }
