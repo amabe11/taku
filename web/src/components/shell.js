@@ -11,6 +11,7 @@ export const NAV = [
   ] },
   { caption: 'Muestras', items: [
     ['muestras', 'Muestras', 'table'],
+    ['lector', 'Lector en vivo (ESP32)', 'wifi'],
     ['priorizacion', 'Cola de laboratorio', 'queue'],
     ['cuenca', 'Vista de cuenca', 'river'],
     ['indicadores', 'Indicadores', 'gauge'],

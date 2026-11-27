@@ -77,6 +77,12 @@
   .print-area h3 { margin-bottom: var(--sp-2); }
   .ficha-demo { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); background: var(--demo-stripe); border: 1px solid color-mix(in oklab, var(--state-demo) 50%, transparent); font-weight: 700; font-size: var(--fs-sm); }
   .limits { list-style: disc; margin: 0 0 var(--sp-2); padding-inline-start: 1.2em; font-size: var(--fs-sm); display: grid; gap: 4px; }
+
+  /* lector en vivo (ESP32) */
+  .lector-nodos { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+  .lector-nodo { text-align: start; font: inherit; color: inherit; cursor: pointer; display: grid; gap: var(--sp-2); }
+  .lector-nodo[aria-pressed="true"] { outline: 2px solid var(--color-accent, currentColor); outline-offset: -2px; }
+  .lector-grafico { display: block; max-height: 240px; color: var(--color-text); }
 }
 
 /* ===================================================================== impresión: solo la ficha, en claro */

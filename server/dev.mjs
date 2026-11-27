@@ -10,9 +10,10 @@ import reportes from './api/reportes.js';
 import admin from './api/admin.js';
 import publicAvisos from './api/public/avisos.js';
 import publicZonas from './api/public/zonas.js';
+import lecturas from './api/lecturas.js';
 
 const ROUTES = { '/api/health': health, '/api/sync': sync, '/api/datos': datos, '/api/alertas': alertas, '/api/reportes': reportes,
-  '/api/admin': admin, '/api/public/avisos': publicAvisos, '/api/public/zonas': publicZonas };
+  '/api/admin': admin, '/api/public/avisos': publicAvisos, '/api/public/zonas': publicZonas, '/api/lecturas': lecturas };
 const PORT = Number(process.env.PORT || 3001);
 
 createServer(async (req, res) => {

@@ -2,6 +2,8 @@
 // Variables de entorno (se configuran en Vercel, nunca en el repositorio):
 //   MONGODB_URI                    cadena de conexión de Atlas (mongodb+srv://…)
 //   AHG_TEAM_KEY (o HG_TEAM_KEY)   clave del equipo; se envía en la cabecera «x-ahg-key» para leer o escribir
+//   AHG_NODE_KEY                   clave de los lectores ESP32 (cabecera «x-ahg-nodo»): SOLO permite enviar lecturas
+//                                  a /api/lecturas. Si se filtra desde un firmware, no da acceso a leer ni a cambiar datos.
 //   AHG_DB                         nombre de la base (opcional; por defecto «ahgora»; si el usuario de Atlas no tiene
 //                                  permiso sobre ella, se usa «hgguard», con la estructura nueva junto a las colecciones
 //                                  viejas de Hg-Guard, que no se tocan ni se leen).
@@ -51,7 +53,7 @@ async function elegirBase(client) {
 export function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-ahg-key, x-hg-key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-ahg-key, x-hg-key, x-ahg-nodo');
   res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') { res.status(204).end(); return true; }
@@ -78,6 +80,54 @@ export function handler(fn, { auth = true, methods = ['GET'] } = {}) {
 }
 
 export const keyOf = () => process.env.AHG_TEAM_KEY || process.env.HG_TEAM_KEY;
+export const nodeKeyOf = () => process.env.AHG_NODE_KEY;
+
+/** ¿Puede este pedido ENVIAR lecturas? Clave de lector (x-ahg-nodo) o, en su defecto, la del equipo. */
+export function esLector(req) {
+  const nodo = nodeKeyOf();
+  const equipo = keyOf();
+  const dada = req.headers['x-ahg-nodo'] || req.headers['x-ahg-key'] || req.headers['x-hg-key'];
+  return !!dada && ((!!nodo && dada === nodo) || (!!equipo && dada === equipo));
+}
+
+// ------------------------------------------------------------------ lecturas del lector ESP32 (WiFi)
+const entero16 = (v) => v !== null && v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 65535;
+export const MAX_LECTURAS = 120;
+
+/**
+ * Valida un envío del lector: { node_id, firmware?, rssi?, lecturas: [{ seq, t?, r, g, b, c, r_norm?, … }] }
+ * (también acepta una sola lectura suelta: el mismo JSON que sale por USB). `t` es la hora de medición en ms
+ * (NTP del ESP32); si falta o es absurda, queda null y vale la hora de llegada. Devuelve { error } o { docs }.
+ */
+export function limpiarLecturas(body, ahora = new Date()) {
+  if (!body || typeof body !== 'object') return { error: 'Cuerpo vacío' };
+  const nodo = String(body.node_id || '').trim();
+  if (!/^[A-Za-z0-9_.-]{2,40}$/.test(nodo)) return { error: 'node_id inválido (letras, números, guion; 2 a 40)' };
+  const lista = Array.isArray(body.lecturas) ? body.lecturas : body.r != null ? [body] : [];
+  if (!lista.length) return { error: 'Faltan lecturas' };
+  if (lista.length > MAX_LECTURAS) return { error: `Demasiadas lecturas en un envío (máx. ${MAX_LECTURAS})` };
+  const norm = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
+  const docs = [];
+  for (const l of lista) {
+    if (!l || !['r', 'g', 'b', 'c'].every((k) => entero16(l[k]))) return { error: 'Cada lectura necesita r, g, b y c enteros entre 0 y 65535' };
+    const t = Number(l.t);
+    // Hora del ESP32 válida si es posterior a 2024 y no está más de 5 minutos en el futuro.
+    const medido = Number.isFinite(t) && t > 1.7e12 && t < ahora.getTime() + 300000 ? new Date(t) : null;
+    docs.push({
+      node_id: nodo,
+      seq: Number.isFinite(Number(l.seq)) ? Number(l.seq) : 0,
+      r: Number(l.r), g: Number(l.g), b: Number(l.b), c: Number(l.c),
+      r_norm: norm(l.r_norm), g_norm: norm(l.g_norm), b_norm: norm(l.b_norm),
+      medido_en: medido,
+      recibido_en: ahora,
+      test_mode: typeof (l.test_mode ?? body.test_mode) === 'boolean' ? (l.test_mode ?? body.test_mode) : true,
+      sensor: String(l.sensor || body.sensor || 'TCS34725').slice(0, 40),
+      firmware: String(body.firmware || '').slice(0, 60),
+      rssi: Number.isFinite(Number(body.rssi)) && body.rssi !== null ? Number(body.rssi) : null,
+    });
+  }
+  return { docs };
+}
 
 // Lo que llega del navegador o de la app se limpia antes de guardarse.
 const SEM = new Set(['rojo', 'amarillo', 'verde', 'invalido']);

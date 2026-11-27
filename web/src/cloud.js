@@ -64,5 +64,13 @@ export const estadoBase = (cfg) => call('/api/admin', { cfg });
 export const inicializarBase = (payload) => call('/api/admin', { method: 'POST', body: { accion: 'inicializar', ...payload }, timeout: 45000 });
 /** Borra del servidor solo lo marcado como demostración. */
 export const borrarDemoServidor = () => call('/api/admin', { method: 'POST', body: { accion: 'borrar_demostracion', por: 'Ahgora Web' }, timeout: 45000 });
+/** Lecturas crudas del lector ESP32 que llegan por WiFi (GET /api/lecturas) y resumen por lector. */
+export async function pullLecturas({ node_id, desde, limit = 120 } = {}) {
+  if (!cloudReady()) throw Object.assign(new Error('Falta la clave del equipo en Configuración.'), { sinConfig: true });
+  const q = new URLSearchParams({ limit: String(limit) });
+  if (node_id) q.set('node_id', node_id);
+  if (desde) q.set('desde', String(desde));
+  return call(`/api/lecturas?${q}`, { timeout: 15000 });
+}
 /** Avisos públicos tal como los recibe Ahgora Comunidad (sin clave). */
 export const avisosPublicos = () => call('/api/public/avisos', { cfg: { ...cloudCfg(), key: '' } });

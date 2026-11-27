@@ -102,6 +102,22 @@ export const ESQUEMAS = {
       demostracion: bool,
     },
   },
+  // Lecturas crudas del lector Ahgora (ESP32 + TCS34725) enviadas por WiFi (POST /api/lecturas).
+  // Son la señal óptica sin interpretar: no son concentración de Hg (guía de Loana, sección 05). La app modo técnico
+  // las promedia y las guarda dentro de la muestra (`lecturas`); aquí quedan como respaldo durante 30 días.
+  lecturas: {
+    bsonType: 'object',
+    required: ['node_id', 'seq', 'r', 'g', 'b', 'c', 'recibido_en'],
+    properties: {
+      node_id: { ...str, maxLength: 40 },
+      seq: num,
+      r: num, g: num, b: num, c: num,
+      r_norm: numONull, g_norm: numONull, b_norm: numONull,
+      medido_en: { bsonType: ['date', 'null'] },
+      recibido_en: { bsonType: 'date' },
+      test_mode: bool, sensor: str, firmware: str, rssi: numONull,
+    },
+  },
   // Sitio piloto: Alcoche (Caranavi). Eje del río, comunidades, frentes y antecedentes.
   sitios: {
     bsonType: 'object',
@@ -124,6 +140,8 @@ export const INDICES = {
   reportes: [[{ recibido_en: -1 }], [{ origen_hash: 1, recibido_en: -1 }]],
   mape: [[{ id: 1 }, { unique: true }], [{ estado_legal: 1 }]],
   sitios: [[{ id: 1 }, { unique: true }]],
+  // TTL de 30 días: protege los 512 MB del plan gratuito (una lectura por segundo son ~15 MB por día de uso).
+  lecturas: [[{ node_id: 1, recibido_en: -1 }], [{ recibido_en: 1 }, { expireAfterSeconds: 30 * 86400 }], [{ node_id: 1, seq: 1, medido_en: 1 }]],
   referencias: [[{ id: 1 }, { unique: true }]],
 };
 

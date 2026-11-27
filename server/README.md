@@ -46,6 +46,8 @@ rechaza documentos sin los campos mínimos. Estructura según la guía vigente (
 | `/api/public/avisos` | GET | No | Avisos vigentes; `?zona_id=`, `?desde=<cursor>` (incluye retiros), `?id=` (detalle). Devuelve `{ items, cursor }` |
 | `/api/alertas` | GET | No | Formato anterior para Ahgora Comunidad (se mantiene por compatibilidad) |
 | `/api/reportes` | POST / GET | No / `x-ahg-key` | Reportes comunitarios (máx. 20 por hora por origen) |
+| `/api/lecturas` | POST | `x-ahg-nodo` (`AHG_NODE_KEY`) | Lector ESP32 por WiFi: `{ node_id, firmware?, rssi?, lecturas: [{ seq, t, r, g, b, c, r_norm… }] }` (máx. 120). Reintentar no duplica (nodo + seq + hora). Colección `lecturas`, se borra sola a los 30 días |
+| `/api/lecturas` | GET | `x-ahg-key` | `?node_id=&desde=<ISO o ms>&limit=` → `{ items, nodos, ahora }`. Lo usan la web («Lector en vivo») y la app modo técnico (lectura «WiFi») |
 
 ### Cargar datos y simular el lector
 
@@ -116,6 +118,8 @@ La cabecera antigua `x-hg-key` y la variable `HG_TEAM_KEY` siguen aceptándose p
    - `MONGODB_URI` = la cadena del paso 1 (con la contraseña real).
    - `AHG_TEAM_KEY` (o la ya existente `HG_TEAM_KEY`) = una clave larga que solo conozca el equipo, por ejemplo la salida de
      `node -e "console.log(crypto.randomUUID())"`.
+   - `AHG_NODE_KEY` = otra clave larga, distinta, para los lectores ESP32 (`firmware/`). Solo permite **enviar** lecturas
+     a `/api/lecturas`: si se filtra desde un firmware, no da acceso a leer ni a cambiar datos.
 5. *Deploy*. Comprueba `https://<tu-proyecto>.vercel.app/api/health` → `{"ok":true,…}`.
 
 ### 3. Conectar la web y la app
