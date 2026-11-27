@@ -1,0 +1,66 @@
+AHGORA · Firmware ESP32 + TCS34725
+==================================
+
+Dos proyectos de PlatformIO (cada uno con src/main.cpp y platformio.ini):
+
+1) sedimentos_AHG-SED-01/
+   Lector de tarjetas y tiras en cámara oscura (Guía Loana v2.0).
+   - Arranque:  LISTO: lector Ahgora - SOLO PRUEBA OPTICA
+   - Un JSON por segundo, exactamente con los campos de la guía:
+     node_id, seq, test_mode (true), sensor, r, g, b, c, r_norm, g_norm, b_norm  (r_norm = r/c*255)
+
+2) peces_AHG-PEZ-01/   (código de nodo PROVISIONAL)
+   Lector de cubetas con nanopartículas de oro, por transmisión (LED -> cubeta -> sensor).
+   - LED blanco en GPIO25 con resistencia de 220 ohm a GND.
+   - Cada segundo mide con LED apagado y encendido, y resta la luz ambiente.
+   - Comandos en el Monitor Serie:
+       CUBETA <nombre>   (ej.: CUBETA E 5, CUBETA Muestra, CUBETA Fortificada)
+       REF               (con la cubeta de agua: guarda I0)
+       INFO
+   - JSON: los mismos campos base + modo, cubeta, r_osc/g_osc/b_osc/c_osc, sat
+     y, con REF guardada, A_r, A_g, A_b, q (= A_r/A_g).
+   - La curva de calibración y los mg/kg se calculan en la PC con los estándares.
+
+Conexión del TCS34725 (los dos proyectos)
+   ESP32 3V3 -> VIN/VCC · GND -> GND · GPIO21 -> SDA · GPIO22 -> SCL
+   (verificar los pines de su placa; alimentar con 3,3 V si no es tolerante a 5 V)
+
+Cómo compilar y cargar
+   A) VS Code + PlatformIO: abrir la carpeta del proyecto -> Build -> Upload -> Monitor (115200).
+      La biblioteca Adafruit TCS34725 se instala sola (platformio.ini, lib_deps).
+   B) Arduino IDE 2.x: crear una carpeta con el nombre del proyecto, copiar main.cpp dentro
+      y renombrarlo a <nombre_de_la_carpeta>.ino. Instalar "Adafruit TCS34725" desde el gestor de
+      bibliotecas y elegir la placa "ESP32 Dev Module".
+
+Para Alvin
+   - Las líneas que empiezan con '{' son lecturas JSON; las demás son mensajes de estado.
+   - Los datos NO son concentración ni valor de Hg (test_mode: true).
+   - Los campos extra del lector de peces y el código AHG-PEZ-01 son una propuesta: confirmar
+     contra el contrato de /api/sync.
+   - No poner la clave x-ahg-key en el firmware.
+
+Estado: compilados y probados en PC con encabezados simulados (sin placa real).
+Antes de usarlos: compilar en PlatformIO/Arduino IDE y probar con el hardware.
+
+
+CORRER EL FIRMWARE EN LA PC (sin placa) — simulador agregado el 27 nov 2026
+==========================================================================
+El mismo src/main.cpp corre en Windows. El sensor TCS34725, el LED y el Monitor Serie son simulados:
+la consola hace de Monitor Serie y las lecturas salen de  pc_sim/escena.h  (ESTE es el archivo para cambiar datos).
+
+1) En VS Code: Archivo > Abrir área de trabajo desde archivo… > ahgora_firmware.code-workspace
+2) Terminal > Ejecutar tarea… > «PC: simular sedimentos (AHG-SED-01)»  o  «PC: simular peces (AHG-PEZ-01)»
+   (Ctrl+Shift+B corre la de sedimentos). Sin VS Code: doble clic en correr_sedimentos_pc.bat o correr_peces_pc.bat.
+3) Escribe comandos en esa terminal y Enter:
+   Sedimentos: TARJETA Roja · TARJETA Blanca · AUTO (secuencia) · LUZ ON / LUZ OFF (luz externa) · SALIR
+   Peces:      CUBETA Agua -> REF (guarda I0) -> CUBETA E 0 / E 5 / E 10 / E 20 / E 40 -> CUBETA Muestra
+               MUESTRA 25  (cambia el Hg simulado de la muestra, en µg/L) · INFO · SALIR
+4) Cada lectura JSON también se guarda en lecturas_AHG-SED-01.jsonl / lecturas_AHG-PEZ-01.jsonl (esta carpeta).
+5) Para cambiar los datos: edita pc_sim/escena.h (colores de tarjetas, ruido, luz, I0, absorbancias de las AuNP,
+   Hg de la muestra), guarda y vuelve a correr la tarea: se recompila sola.
+   Opcional: comandos automáticos, uno cada 4 s:  set AHG_SIM_COMANDOS=CUBETA Agua;REF;CUBETA E 5;CUBETA Muestra
+
+Requisito: g++ (MinGW) en el PATH (en esta PC ya está en C:\MinGW\bin). Verificado: los dos nodos compilan
+y corren en la PC, y también compilan para el ESP32 con PlatformIO (pio run), el 27 nov 2026.
+Para la placa real: abre la carpeta del proyecto (o el área de trabajo) y usa los botones de PlatformIO
+(✓ Build, → Upload, 🔌 Monitor a 115200).

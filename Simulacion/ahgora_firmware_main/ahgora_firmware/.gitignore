@@ -1,0 +1,5 @@
+# compilados de PlatformIO y del simulador en PC
+.pio/
+.vscode/
+pc_sim/*.exe
+*.jsonl

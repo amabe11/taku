@@ -1,0 +1,36 @@
+{
+  // AHGORA · abrir con VS Code: Archivo > Abrir área de trabajo desde archivo… > este archivo.
+  // · PlatformIO reconoce los dos proyectos (para compilar y cargar en el ESP32 real).
+  // · Terminal > Ejecutar tarea… > «PC: simular …» corre el firmware en la PC, sin placa.
+  "folders": [
+    { "name": "ahgora_firmware (simulador en PC)", "path": "." },
+    { "name": "sedimentos_AHG-SED-01", "path": "sedimentos_AHG-SED-01" },
+    { "name": "peces_AHG-PEZ-01", "path": "peces_AHG-PEZ-01" }
+  ],
+  "settings": {
+    "files.associations": { "*.ino": "cpp" }
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "PC: simular sedimentos (AHG-SED-01)",
+        "type": "shell",
+        "command": "cmd",
+        "args": ["/c", "${workspaceFolder:ahgora_firmware (simulador en PC)}\\correr_sedimentos_pc.bat"],
+        "group": { "kind": "build", "isDefault": true },
+        "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "clear": true },
+        "problemMatcher": []
+      },
+      {
+        "label": "PC: simular peces (AHG-PEZ-01)",
+        "type": "shell",
+        "command": "cmd",
+        "args": ["/c", "${workspaceFolder:ahgora_firmware (simulador en PC)}\\correr_peces_pc.bat"],
+        "group": "build",
+        "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "clear": true },
+        "problemMatcher": []
+      }
+    ]
+  }
+}
