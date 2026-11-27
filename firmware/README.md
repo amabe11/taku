@@ -34,7 +34,21 @@ HORA: sincronizada por NTP
 ENVIO: 10 lecturas al servidor · quedan 0
 ```
 
-`secretos.h` no se sube a GitHub (`.gitignore`).
+`secretos.h` no se sube a GitHub (`.gitignore`): el repositorio es público.
+
+### Si la carga falla con «No serial data received» o «Wrong boot mode detected»
+
+La placa no está entrando en modo de programación (el reinicio automático no baja GPIO0). Con el Monitor Serie
+cerrado:
+
+1. Mantén apretado **BOOT** (IO0).
+2. Sin soltarlo, aprieta y suelta **EN** (RST).
+3. Suelta **BOOT**: la placa queda esperando el programa.
+4. *Subir* en el Arduino IDE (o `esptool --before no-reset write-flash 0x0 <sketch>.ino.merged.bin`).
+5. Al terminar, aprieta **EN** una vez para que arranque el programa.
+
+Probado el 26/11/2026 con un ESP32-D0WD-V3: carga correcta y en el Monitor Serie
+`ENVIO: 10 lecturas al servidor · quedan 0` cada ~10 s.
 
 ## 3. Qué hace sin señal
 

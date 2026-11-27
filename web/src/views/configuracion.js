@@ -6,7 +6,8 @@ import { state, on } from '../state.js';
 import { persistGranted, requestPersist } from '../store.js';
 import { switchMode } from '../components/shell.js';
 import { downloadText, parseCsv, stamp } from '../csv.js';
-import { cloudCfg, saveCloudCfg, testCloud, cloudReady, estadoBase, inicializarBase, borrarDemoServidor, pushMuestras, pushMape } from '../cloud.js';
+import { cloudCfg, saveCloudCfg, testCloud, cloudReady, estadoBase, inicializarBase, borrarDemoServidor, pushMuestras, pushMape, pullLecturas } from '../cloud.js';
+import * as fmt from '../lib/format.js';
 import { demoMuestras, demoMape, DEMO_CUENCA } from '../data/demo.js';
 import { SITIO, REFERENCIAS, ZONAS } from '../data/alcoche.js';
 import { syncNube, importMuestras, resetDemo, clearLocal } from '../data.js';
@@ -33,6 +34,9 @@ export function configuracionView() {
   const keyIn = h('input', { class: 'input mono', id: 'cl-key', name: 'key', type: 'password', autocomplete: 'off', value: cc.key || '' });
   const say = (t) => { cloudStatus.textContent = t; announce(t); };
   const saveCfg = () => saveCloudCfg({ ...cloudCfg(), api: apiIn.value.trim().replace(/\/$/, ''), key: keyIn.value });
+  // La clave se guarda al escribirla (antes solo con «Probar conexión»): así «Lector en vivo» la usa enseguida.
+  apiIn.addEventListener('change', () => { saveCfg(); buscarLectores(); });
+  keyIn.addEventListener('change', () => { saveCfg(); buscarLectores(); });
   const cloudCard = h('form', { class: 'card', 'aria-labelledby': 'cfg-cloud', onsubmit: (e) => e.preventDefault() },
     h('h2', { class: 'card-title', id: 'cfg-cloud' }, 'Servidor Ahgora'),
     h('p', { class: 'meta' }, 'Base de datos central que reúne los resultados de campo y las confirmaciones del laboratorio. La clave del equipo queda solo en este navegador.'),
@@ -42,17 +46,41 @@ export function configuracionView() {
     h('div', { class: 'view-actions' },
       h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {
         saveCfg(); say('Probando conexión…');
-        try { const r = await testCloud(cloudCfg()); say(`Conexión correcta con la base «${r.base}».`); } catch (e) { say(`No se pudo conectar: ${e.message}`); }
+        try { const r = await testCloud(cloudCfg()); say(`Conexión correcta con la base «${r.base}».`); buscarLectores(); } catch (e) { say(`No se pudo conectar: ${e.message}`); }
       } }, icon('sync'), 'Probar conexión'),
       h('button', { class: 'btn btn-primary', type: 'button', disabled: state.mode !== 'nube', onclick: async () => { saveCfg(); await syncNube(); say(state.nube.mensaje); } }, 'Sincronizar ahora')),
     state.mode !== 'nube' ? h('p', { class: 'meta', style: { margin: 0 } }, 'Para sincronizar, cambia el origen a «Servidor Ahgora».') : null,
     cloudStatus);
 
+  // ---------------- lector ESP32 por WiFi (colección «lecturas»)
+  const lectorInfo = h('div', { role: 'status' }, h('p', { class: 'meta', style: { margin: 0 } }, 'Escribe la clave del equipo arriba para ver los lectores.'));
+  async function buscarLectores() {
+    if (!cloudReady()) { mount(lectorInfo, h('p', { class: 'meta', style: { margin: 0 } }, 'Escribe la clave del equipo arriba para ver los lectores.')); return; }
+    mount(lectorInfo, h('p', { class: 'meta', style: { margin: 0 } }, 'Buscando lectores…'));
+    try {
+      const { nodos } = await pullLecturas({ limit: 1 });
+      mount(lectorInfo, nodos.length
+        ? h('ul', { class: 'limits' }, nodos.map((n) => {
+          const t = new Date(n.ultima.recibido_en).getTime();
+          const vivo = Date.now() - t < 20000;
+          return h('li', null, h('strong', null, n.node_id), ` · ${vivo ? 'enviando ahora' : 'sin señal'} · última lectura ${fmt.ago(t)} · ${fmt.int(n.total_24h)} en 24 h`);
+        }))
+        : h('p', { class: 'meta', style: { margin: 0 } }, 'Todavía no llegó ninguna lectura del lector.'));
+    } catch (e) { mount(lectorInfo, h('p', { class: 'form-error', style: { margin: 0 } }, `No se pudo consultar: ${e.message}`)); }
+  }
+  const lectorCard = h('section', { class: 'card', 'aria-labelledby': 'cfg-lector' },
+    h('h2', { class: 'card-title', id: 'cfg-lector' }, 'Lector ESP32 (WiFi)'),
+    h('p', { class: 'meta' }, 'Lectores que enviaron señal cruda del sensor a la colección «lecturas» desde el hotspot del celular.'),
+    lectorInfo,
+    h('div', { class: 'view-actions' },
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { saveCfg(); buscarLectores(); } }, icon('sync'), 'Actualizar'),
+      h('a', { class: 'btn btn-primary', href: '#/lector' }, 'Ver en vivo')));
+
   // ---------------- base de datos del servidor (MongoDB «ahgora»)
   const dbStatus = h('p', { class: 'meta', role: 'status', style: { margin: 0 } });
   const dbTable = h('div', { class: 'table-wrap' });
   const dbSay = (t) => { dbStatus.textContent = t; announce(t); };
-  const NOMBRES = { muestras: 'Muestras (registro técnico)', avisos: 'Avisos públicos (Ahgora Comunidad)', bitacora: 'Bitácora de publicación', zonas: 'Zonas públicas (0,1°)', reportes: 'Reportes comunitarios', mape: 'Unidades mineras (MAPE)', sitios: 'Sitio piloto', referencias: 'Antecedentes' };
+  const NOMBRES = { muestras: 'Muestras (registro técnico)', avisos: 'Avisos públicos (Ahgora Comunidad)', bitacora: 'Bitácora de publicación', zonas: 'Zonas públicas (0,1°)', reportes: 'Reportes comunitarios', lecturas: 'Lecturas del lector ESP32 (WiFi)', mape: 'Unidades mineras (MAPE)', sitios: 'Sitio piloto', referencias: 'Antecedentes' };
   function showEstado(r) {
     mount(dbTable, h('table', { class: 'data-table compact db-table' },
       h('caption', { class: 'sr-only' }, `Colecciones de la base ${r.base}`),
@@ -144,7 +172,7 @@ export function configuracionView() {
     dl([
       ['Para quién', 'Autoridades ambientales y de salud, laboratorios, investigadores y cooperación'],
       ['Registro', 'código, matriz, coordenadas, fecha, responsable, lecturas crudas, valor estimado, semáforo, controles, versión de calibración, certeza, laboratorio, visibilidad (7.6)'],
-      ['API', 'POST /api/sync · GET /api/datos · GET|POST /api/admin · GET /api/public/zonas y /api/public/avisos (públicos, guía 09) · GET /api/alertas · /api/reportes'],
+      ['API', 'POST /api/sync · GET /api/datos · GET|POST /api/admin · GET /api/public/zonas y /api/public/avisos (públicos, guía 09) · GET /api/alertas · /api/reportes · /api/lecturas (lector ESP32)'],
       ['Mapa', 'Natural Earth 1:10m · relieve ETOPO1 (NOAA) · OpenStreetMap (ODbL) · Amazon Mining Watch (CC BY 4.0) · Sentinel-2 cloudless (EOX) · NASA GIBS'],
       ['Datos del sitio', 'GloFAS y ERA5 vía Open-Meteo · SoilGrids 2.0 (ISRIC) · GBIF · NASA POWER'],
       ['Tipografía', 'Atkinson Hyperlegible Next y Mono (SIL OFL)'],
@@ -153,8 +181,9 @@ export function configuracionView() {
 
   const el = h('div', { class: 'view' },
     viewHeader('Configuración', 'Opciones de esta web. Se guardan en este navegador.'),
-    h('div', { class: 'two-col' }, modeForm, cloudCard, dbCard, importCard, dataCard, about));
+    h('div', { class: 'two-col' }, modeForm, cloudCard, lectorCard, dbCard, importCard, dataCard, about));
   const offs = [on('muestras', renderData), on('nube', () => { if (state.nube.mensaje) cloudStatus.textContent = state.nube.mensaje; })];
   renderData();
+  buscarLectores();
   return { el, destroy() { offs.forEach((f) => f()); } };
 }
